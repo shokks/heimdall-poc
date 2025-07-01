@@ -25,7 +25,8 @@
       "Bash(curl:*)",
       "Bash(npx convex dev:*)",
       "Bash(grep:*)",
-      "Bash(rg:*)"
+      "Bash(rg:*)",
+      "WebFetch(domain:finnhub.io)"
     ],
     "deny": []
   }

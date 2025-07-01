@@ -7,6 +7,7 @@ export interface PortfolioPosition {
   dailyChangePercent?: string;
   totalValue?: number;
   source?: 'alphavantage' | 'finnhub' | 'demo' | 'cache';
+  lastUpdated?: number; // Timestamp for tracking new additions
 }
 
 // Legacy localStorage functions for migration and fallback

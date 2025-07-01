@@ -1,5 +1,6 @@
 import type { NextRequest } from 'next/server';
 import { OpenAI } from 'openai';
+import { validateTickers, combineValidationScores, searchCompanySymbols } from '@/lib/ticker-validation';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -19,58 +20,108 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const prompt = `
-You are a financial assistant that extracts stock portfolio information from natural language descriptions.
+    // STEP 1: Extract user intent for company references from natural language
+    const extractionPrompt = `
+You are an expert at extracting investment intent from natural language portfolio descriptions.
 
-Parse this portfolio description and extract stock positions:
+Analyze this text and extract what companies the user is referring to:
 "${portfolioText}"
 
-Return a JSON array of objects with this exact format:
-[{"symbol": "AAPL", "shares": 100, "companyName": "Apple Inc."}]
+Extract:
+1. What company the user INTENDED to reference (resolve nicknames, typos, descriptions to actual company intent)
+2. Share quantities (if mentioned, otherwise use 1)
 
-Rules:
-1. Recognize ANY valid publicly traded US stock symbols (1-5 uppercase letters)
-2. Use your knowledge of companies to map company names to their correct stock symbols
-3. If shares aren't specified, use 1 as default
-4. Use proper official company names (e.g., "Apple Inc." not "apple")
-5. If no valid stocks are found, return an empty array []
-6. Be comprehensive - recognize major companies like Apple (AAPL), Microsoft (MSFT), Google/Alphabet (GOOGL), Tesla (TSLA), Amazon (AMZN), Netflix (NFLX), Meta/Facebook (META), Nvidia (NVDA), Disney (DIS), Boeing (BA), Coca-Cola (KO), McDonald's (MCD), Walmart (WMT), JPMorgan Chase (JPM), Berkshire Hathaway (BRK.B), Johnson & Johnson (JNJ), Procter & Gamble (PG), Visa (V), Mastercard (MA), Home Depot (HD), and thousands of others
-7. Handle variations in company names (e.g., "Facebook" or "Meta" both map to META)
+Examples of intent extraction:
+- "apple stock" → "Apple" (referring to Apple Inc.)
+- "microsft" → "Microsoft" (typo correction)
+- "facebok" → "Facebook" (typo, now Meta)
+- "iPhone maker" → "Apple" (description to company)
+- "AMZN" → "Amazon" (ticker to company)
+- "google" → "Google" (common name for Alphabet)
+- "coke" → "Coca-Cola" (nickname)
+- "windows company" → "Microsoft" (product reference)
 
+Be VERY GENEROUS in extracting intent - include anything that could reasonably refer to a public company.
+Resolve obvious typos and variations to the intended company name.
+Convert product/service references to company names.
+Normalize informal names to proper company references.
+
+Return JSON array: [{"intent": "Company Name", "shares": number}]
+
+Focus on INTENT not exact spelling - we will search for the actual company later.
 Return only the JSON array, no additional text.
     `.trim();
 
-    const response = await openai.chat.completions.create({
+    console.log('Step 1: Extracting company names...');
+    const extractionResponse = await openai.chat.completions.create({
       model: 'gpt-4o',
-      messages: [{ role: 'user', content: prompt }],
+      messages: [{ role: 'user', content: extractionPrompt }],
       temperature: 0.1,
-      max_tokens: 1000,
+      max_tokens: 800,
     });
 
-    const content = response.choices[0]?.message?.content;
-
-    if (!content) {
+    const extractionContent = extractionResponse.choices[0]?.message?.content;
+    if (!extractionContent) {
       return Response.json(
-        { error: 'No response from AI model' },
+        { error: 'Failed to extract companies from description' },
         { status: 500 }
       );
     }
 
-    // Parse the JSON response
-    let positions: unknown;
+    // Parse extraction results
+    let extractedIntents: Array<{intent: string, shares: number}>;
     try {
-      // Clean the response - remove any markdown code blocks
-      const cleanedContent = content.replace(/```json\n?|\n?```/g, '').trim();
-      positions = JSON.parse(cleanedContent);
+      const cleanedContent = extractionContent.replace(/```json\n?|\n?```/g, '').trim();
+      extractedIntents = JSON.parse(cleanedContent);
     } catch (_parseError) {
       return Response.json(
-        {
-          error:
-            'Failed to parse AI response. Please try rephrasing your portfolio description.',
-        },
+        { error: 'Failed to parse company extraction. Please try rephrasing.' },
         { status: 500 }
       );
     }
+
+    if (!Array.isArray(extractedIntents) || extractedIntents.length === 0) {
+      return Response.json({ 
+        positions: [],
+        validationSummary: {
+          totalParsed: 0,
+          passedBasicValidation: 0,
+          passedMarketValidation: 0,
+          invalidTickers: [],
+          extractedCompanies: [],
+          warnings: ['No companies found in the description']
+        }
+      });
+    }
+
+    console.log(`Step 1 complete: Extracted ${extractedIntents.length} company intents:`, extractedIntents);
+
+    // STEP 2: Search for ticker symbols using Finnhub symbol search
+    console.log('Step 2: Searching for ticker symbols using Finnhub...');
+    
+    const searchQueries = extractedIntents.map(intent => intent.intent);
+    const searchResults = await searchCompanySymbols(searchQueries);
+    
+    // Convert search results to positions format
+    const positions = extractedIntents.map((intent, index) => {
+      const searchResult = searchResults[index];
+      
+      if (!searchResult) {
+        return null; // Will be filtered out
+      }
+      
+      return {
+        symbol: searchResult.symbol,
+        shares: intent.shares,
+        companyName: searchResult.companyName,
+        confidence: searchResult.confidence,
+        searchQuery: intent.intent,
+        isExactMatch: searchResult.isExactMatch,
+        source: searchResult.source
+      };
+    }).filter(Boolean); // Remove null results
+    
+    console.log(`Step 2 complete: Found ${positions.length} ticker matches out of ${extractedIntents.length} intents:`, positions);
 
     // Validate the response format
     if (!Array.isArray(positions)) {
@@ -80,8 +131,8 @@ Return only the JSON array, no additional text.
       );
     }
 
-    // Validate each position
-    const validPositions = positions.filter((position) => {
+    // PASS 1: Basic validation of GPT response format
+    const basicValidPositions = positions.filter((position) => {
       return (
         position &&
         typeof position === 'object' &&
@@ -90,11 +141,106 @@ Return only the JSON array, no additional text.
         typeof position.shares === 'number' &&
         position.shares > 0 &&
         typeof position.companyName === 'string' &&
-        position.companyName.trim().length > 0
+        position.companyName.trim().length > 0 &&
+        typeof position.confidence === 'number' &&
+        position.confidence >= 0.5 // Only include positions with confidence >= 50% (market validation will filter)
       );
     });
 
-    return Response.json({ positions: validPositions });
+    if (basicValidPositions.length === 0) {
+      return Response.json({ 
+        positions: [],
+        validationSummary: {
+          totalParsed: positions.length,
+          passedBasicValidation: 0,
+          passedMarketValidation: 0,
+          invalidTickers: [],
+          extractedCompanies: extractedIntents.map(c => c.intent),
+          searchResults: searchResults.map((result, index) => ({
+            intent: extractedIntents[index].intent,
+            found: result ? `${result.companyName} (${result.symbol})` : null,
+            confidence: result?.confidence || 0
+          })),
+          warnings: ['No valid positions found after ticker mapping']
+        }
+      });
+    }
+
+    // PASS 2: Market validation using Finnhub API
+    console.log(`Validating ${basicValidPositions.length} tickers against market data...`);
+    
+    const symbols = basicValidPositions.map(pos => pos!.symbol);
+    const marketValidations = await validateTickers(symbols);
+    
+    // Combine search confidence with market validation
+    const enhancedPositions = basicValidPositions.map((position, index) => {
+      const pos = position!; // We know it's not null from filter
+      const marketValidation = marketValidations[index];
+      const combinedConfidence = combineValidationScores(
+        pos.confidence,
+        marketValidation
+      );
+      
+      return {
+        symbol: pos.symbol,
+        shares: pos.shares,
+        companyName: marketValidation.companyName || pos.companyName,
+        confidence: combinedConfidence,
+        gptConfidence: pos.confidence,
+        searchQuery: pos.searchQuery,
+        isExactMatch: pos.isExactMatch,
+        searchSource: pos.source,
+        marketValidation: {
+          isValid: marketValidation.isValid,
+          confidence: marketValidation.confidence,
+          source: marketValidation.source,
+          marketCap: marketValidation.marketCap,
+          error: marketValidation.error
+        }
+      };
+    });
+
+    // Filter out positions that fail market validation
+    const finalValidPositions = enhancedPositions.filter(pos => 
+      pos.marketValidation.isValid && pos.confidence >= 0.5
+    );
+
+    // Collect validation summary
+    const invalidTickers = enhancedPositions
+      .filter(pos => !pos.marketValidation.isValid)
+      .map(pos => pos.symbol);
+    
+    const lowConfidenceTickers = enhancedPositions
+      .filter(pos => pos.marketValidation.isValid && pos.confidence < 0.7)
+      .map(pos => pos.symbol);
+
+    const warnings = [];
+    if (invalidTickers.length > 0) {
+      warnings.push(`Invalid tickers found: ${invalidTickers.join(', ')}`);
+    }
+    if (lowConfidenceTickers.length > 0) {
+      warnings.push(`Low confidence tickers: ${lowConfidenceTickers.join(', ')}`);
+    }
+
+    console.log(`Validation complete: ${finalValidPositions.length}/${basicValidPositions.length} positions validated`);
+
+    return Response.json({ 
+      positions: finalValidPositions,
+      validationSummary: {
+        totalParsed: positions.length,
+        passedBasicValidation: basicValidPositions.length,
+        passedMarketValidation: finalValidPositions.length,
+        invalidTickers,
+        lowConfidenceTickers,
+        extractedCompanies: extractedIntents.map(c => c.intent),
+        searchResults: searchResults.map((result, index) => ({
+          intent: extractedIntents[index].intent,
+          found: result ? `${result.companyName} (${result.symbol})` : null,
+          confidence: result?.confidence || 0
+        })),
+        warnings
+      }
+    });
   } catch (error) {
     if (error instanceof Error && error.message.includes('API key')) {
       return Response.json(

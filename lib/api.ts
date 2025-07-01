@@ -1,11 +1,22 @@
 import type { PortfolioPosition } from './storage';
+import type { ParsePortfolioResponse, PortfolioParsingResult, EnhancedPortfolioPosition } from '@/types/portfolio';
 
 /**
- * Parse portfolio text using OpenAI API
+ * Parse portfolio text using OpenAI API with enhanced validation
  */
 export const parsePortfolioText = async (
   portfolioText: string
 ): Promise<PortfolioPosition[]> => {
+  const result = await parsePortfolioWithValidation(portfolioText);
+  return result.positions;
+};
+
+/**
+ * Parse portfolio text with full validation details
+ */
+export const parsePortfolioWithValidation = async (
+  portfolioText: string
+): Promise<PortfolioParsingResult> => {
   try {
     const response = await fetch('/api/parse-portfolio', {
       method: 'POST',
@@ -16,12 +27,37 @@ export const parsePortfolioText = async (
     });
 
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
     }
 
-    const data = await response.json();
-    return data.positions || [];
-  } catch (_error) {
+    const data: ParsePortfolioResponse = await response.json();
+    
+    // Convert enhanced positions to standard positions for backward compatibility
+    const positions: PortfolioPosition[] = data.positions.map((pos: EnhancedPortfolioPosition) => ({
+      symbol: pos.symbol,
+      shares: pos.shares,
+      companyName: pos.companyName,
+      currentPrice: pos.currentPrice,
+      dailyChange: pos.dailyChange,
+      dailyChangePercent: pos.dailyChangePercent,
+      totalValue: pos.totalValue,
+      source: pos.source
+    }));
+
+    const hasWarnings = data.validationSummary.warnings.length > 0;
+    const hasErrors = data.validationSummary.invalidTickers.length > 0;
+
+    return {
+      positions,
+      validationSummary: data.validationSummary,
+      hasWarnings,
+      hasErrors
+    };
+  } catch (error) {
+    if (error instanceof Error) {
+      throw error;
+    }
     throw new Error('Failed to parse portfolio. Please try again.');
   }
 };

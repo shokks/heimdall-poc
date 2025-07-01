@@ -106,12 +106,16 @@ export default function DashboardClient() {
     }
   }, [portfolio]);
 
-  const handlePortfolioParsed = async (positions: PortfolioPosition[]) => {
-    if (positions.length > 0 && user) {
+  const handlePortfolioParsed = async (newPositions: PortfolioPosition[]) => {
+    if (newPositions.length > 0 && user) {
       try {
+        // Smart merging: combine new positions with existing ones
+        const existingPositions = portfolio?.positions || [];
+        const mergedPositions = smartMergePositions(existingPositions, newPositions);
+        
         await savePortfolio({
           clerkId: user.id,
-          positions,
+          positions: mergedPositions,
         });
         // Create snapshot after saving
         await createSnapshot({ clerkId: user.id });
@@ -120,6 +124,33 @@ export default function DashboardClient() {
         console.error('Failed to save portfolio:', error);
       }
     }
+  };
+
+  // Smart merge function to handle duplicate symbols
+  const smartMergePositions = (existing: PortfolioPosition[], newPositions: PortfolioPosition[]): PortfolioPosition[] => {
+    const merged = [...existing];
+    
+    newPositions.forEach(newPos => {
+      const existingIndex = merged.findIndex(pos => pos.symbol === newPos.symbol);
+      
+      if (existingIndex >= 0) {
+        // Update existing position by adding shares
+        merged[existingIndex] = {
+          ...merged[existingIndex],
+          shares: merged[existingIndex].shares + newPos.shares,
+          // Mark as recently updated for highlighting
+          lastUpdated: Date.now()
+        };
+      } else {
+        // Add new position with timestamp for highlighting
+        merged.push({
+          ...newPos,
+          lastUpdated: Date.now()
+        });
+      }
+    });
+    
+    return merged;
   };
 
   const handleEditPortfolio = () => {
