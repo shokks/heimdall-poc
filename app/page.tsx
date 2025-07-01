@@ -6,6 +6,7 @@ import { PortfolioDisplay } from '@/components/PortfolioDisplay';
 import NewsDisplay from '@/components/NewsDisplay';
 import InsightsDisplay from '@/components/InsightsDisplay';
 import { type PortfolioPosition, hasPortfolio, loadPortfolio } from '@/lib/storage';
+import { Settings2 } from 'lucide-react';
 
 export default function Home() {
   const [showPortfolio, setShowPortfolio] = useState(false);
@@ -57,9 +58,13 @@ export default function Home() {
                   setShowPortfolio(false);
                   setPortfolio([]);
                 }}
-                className="text-sm text-muted-foreground hover:text-foreground underline"
+                className="inline-flex items-center gap-2 p-2 rounded-full bg-background hover:bg-muted transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 text-muted-foreground hover:text-foreground shadow-sm"
+                aria-label="Edit Portfolio"
+                tabIndex={0}
+                type="button"
               >
-                Edit Portfolio
+                <Settings2 className="h-4 w-4" aria-hidden="true" />
+                <span className="sr-only">Edit Portfolio</span>
               </button>
             </div>
             <PortfolioDisplay portfolio={portfolio} />

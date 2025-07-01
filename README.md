@@ -35,16 +35,23 @@ Create `.env.local` file with:
 ```bash
 OPENAI_API_KEY=your_openai_key_here
 ALPHA_VANTAGE_API_KEY=your_alpha_vantage_key_here
-# Or for testing without real API:
+FINNHUB_API_KEY=your_finnhub_key_here
+# Or for testing without real APIs:
 # ALPHA_VANTAGE_API_KEY=demo
 ```
 
 **API Key Sources:**
 
 - OpenAI: https://platform.openai.com/api-keys
-- Alpha Vantage: https://www.alphavantage.co/support/#api-key
+- Alpha Vantage: https://www.alphavantage.co/support/#api-key (500 calls/day free)
+- Finnhub: https://finnhub.io/register (60 calls/min free)
 
-**Note**: Use `ALPHA_VANTAGE_API_KEY=demo` for testing with mock data if you don't have an API key.
+**API Fallback System:**
+- Primary: Alpha Vantage (more comprehensive data)
+- Fallback: Finnhub (higher rate limits)
+- Demo: Use `ALPHA_VANTAGE_API_KEY=demo` for testing with mock data
+
+**Caching:** Stock prices are cached in localStorage for 5 minutes to minimize API calls.
 
 ## 📁 Project Structure
 
@@ -118,21 +125,23 @@ The project uses a semantic color system with CSS custom properties defined in `
 - **Input**: Text description ("I have 100 Apple shares")
 - **Output**: Structured portfolio data
 
-### Alpha Vantage API
+### Stock Price APIs (with Fallback)
 
 - **Endpoint**: `/api/stock-prices`
-- **Purpose**: Fetch real-time stock prices
-- **Function**: GLOBAL_QUOTE
-- **Rate Limit**: 5 calls/minute (free tier)
+- **Primary**: Alpha Vantage GLOBAL_QUOTE (500 calls/day)
+- **Fallback**: Finnhub Quote API (60 calls/minute)
+- **Caching**: 5-minute localStorage cache
+- **Features**: Automatic fallback, source tracking, error aggregation
 
 ## 📊 Data Flow
 
 1. **Portfolio Entry**: User enters natural language description
 2. **AI Parsing**: OpenAI extracts stock symbols and quantities
-3. **Price Fetching**: Alpha Vantage provides real-time prices
-4. **News Filtering**: System filters mock news by portfolio symbols
-5. **Insights Generation**: AI analyzes portfolio performance
-6. **Persistence**: LocalStorage saves portfolio data
+3. **Price Fetching**: Check localStorage cache → Alpha Vantage → Finnhub fallback
+4. **Price Caching**: Store successful API responses for 5 minutes
+5. **News Filtering**: System filters mock news by portfolio symbols
+6. **Insights Generation**: AI analyzes portfolio performance
+7. **Persistence**: LocalStorage saves portfolio data and price cache
 
 ## 🚦 Current Implementation Status
 

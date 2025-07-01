@@ -6,6 +6,7 @@ export interface PortfolioPosition {
   dailyChange?: number;
   dailyChangePercent?: string;
   totalValue?: number;
+  source?: 'alphavantage' | 'finnhub' | 'demo' | 'cache';
 }
 
 /**

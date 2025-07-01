@@ -10,7 +10,7 @@ import {
   calculatePortfolioValue,
   calculatePortfolioDailyChange,
 } from '@/lib/storage';
-import { enrichPortfolioWithPrices } from '@/lib/api';
+import { enrichPortfolioWithPrices, clearStockPriceCache } from '@/lib/api';
 import { TrendingUp, TrendingDown, RefreshCw, DollarSign } from 'lucide-react';
 
 /**
@@ -66,7 +66,10 @@ export function PortfolioDisplay({ portfolio: initialPortfolio }: PortfolioDispl
     }
   }, []);
 
-  const refreshPrices = () => {
+  const refreshPrices = (skipCache = false) => {
+    if (skipCache) {
+      clearStockPriceCache();
+    }
     fetchStockPrices(portfolio);
   };
 
@@ -107,17 +110,35 @@ export function PortfolioDisplay({ portfolio: initialPortfolio }: PortfolioDispl
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <CardTitle className="text-2xl font-bold">Portfolio Summary</CardTitle>
-            <button
-              onClick={refreshPrices}
-              disabled={isLoading}
-              className="p-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
-            >
-              <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={() => refreshPrices(false)}
+                disabled={isLoading}
+                className="p-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
+                title="Refresh (use cache if available)"
+              >
+                <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+              </button>
+              <button
+                onClick={() => refreshPrices(true)}
+                disabled={isLoading}
+                className="px-3 py-2 text-xs rounded-lg bg-secondary text-secondary-foreground hover:bg-secondary/90 disabled:opacity-50 transition-colors"
+                title="Force refresh (skip cache)"
+              >
+                Force
+              </button>
+            </div>
           </div>
           {lastUpdated && (
             <p className="text-sm text-muted-foreground">
               Last updated: {lastUpdated.toLocaleTimeString()}
+              {portfolio.length > 0 && portfolio[0].source && (
+                <span className="ml-2">
+                  • Source: {portfolio[0].source === 'alphavantage' ? 'Alpha Vantage' : 
+                           portfolio[0].source === 'finnhub' ? 'Finnhub' :
+                           portfolio[0].source === 'demo' ? 'Demo' : 'Cache'}
+                </span>
+              )}
             </p>
           )}
         </CardHeader>

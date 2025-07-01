@@ -29,18 +29,13 @@ Return a JSON array of objects with this exact format:
 [{"symbol": "AAPL", "shares": 100, "companyName": "Apple Inc."}]
 
 Rules:
-1. Only include valid US stock symbols (1-5 uppercase letters)
-2. If shares aren't specified, use 1 as default
-3. Use proper company names (e.g., "Apple Inc." not "apple")
-4. If no valid stocks are found, return an empty array []
-5. Common stock mappings:
-   - Apple -> AAPL (Apple Inc.)
-   - Microsoft -> MSFT (Microsoft Corporation)
-   - Google/Alphabet -> GOOGL (Alphabet Inc.)
-   - Tesla -> TSLA (Tesla, Inc.)
-   - Amazon -> AMZN (Amazon.com, Inc.)
-   - Netflix -> NFLX (Netflix, Inc.)
-   - Meta/Facebook -> META (Meta Platforms, Inc.)
+1. Recognize ANY valid publicly traded US stock symbols (1-5 uppercase letters)
+2. Use your knowledge of companies to map company names to their correct stock symbols
+3. If shares aren't specified, use 1 as default
+4. Use proper official company names (e.g., "Apple Inc." not "apple")
+5. If no valid stocks are found, return an empty array []
+6. Be comprehensive - recognize major companies like Apple (AAPL), Microsoft (MSFT), Google/Alphabet (GOOGL), Tesla (TSLA), Amazon (AMZN), Netflix (NFLX), Meta/Facebook (META), Nvidia (NVDA), Disney (DIS), Boeing (BA), Coca-Cola (KO), McDonald's (MCD), Walmart (WMT), JPMorgan Chase (JPM), Berkshire Hathaway (BRK.B), Johnson & Johnson (JNJ), Procter & Gamble (PG), Visa (V), Mastercard (MA), Home Depot (HD), and thousands of others
+7. Handle variations in company names (e.g., "Facebook" or "Meta" both map to META)
 
 Return only the JSON array, no additional text.
     `.trim();
