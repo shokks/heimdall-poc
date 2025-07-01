@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install:*)",
+      "Bash(npm run lint)",
+      "Bash(npx ultracite check)",
+      "Bash(npx ultracite:*)",
+      "Bash(npm run build:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npx shadcn@latest add:*)"
+    ],
+    "deny": []
+  }
+}

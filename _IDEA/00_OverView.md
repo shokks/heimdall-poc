@@ -23,11 +23,11 @@ Enter your portfolio. See only relevant news. Get simple insights. That's it.
 ### What to Build:
 1. **Portfolio Input**
    - AI-powered text input: "I have 100 Apple shares and 50 Microsoft"
-   - Parse with OpenAI (already built)
+   - Parse with OpenAI API
    - Store in localStorage (no database needed)
 
 2. **Portfolio Display**
-   - Fetch real prices (Alpha Vantage)
+   - Fetch real prices (Alpha Vantage API)
    - Show total value and daily change
    - Clean, mobile-first cards
 
@@ -41,12 +41,12 @@ Enter your portfolio. See only relevant news. Get simple insights. That's it.
    - Generated based on actual portfolio
 
 ### Technical Requirements:
-- Next.js (already set up)
+- Next.js (current setup)
 - localStorage for persistence
-- OpenAI for parsing (already integrated)
+- OpenAI API integration
 - Mock news data (hardcoded)
-- Alpha Vantage for prices
-- Beautiful Navy & Teal UI (already built)
+- Alpha Vantage API for prices
+- Navy & Teal UI design
 
 ### Success Criteria:
 - User enters portfolio naturally
@@ -149,11 +149,11 @@ Enter your portfolio. See only relevant news. Get simple insights. That's it.
 
 ## POC in 5 Steps:
 
-### Step 1: Clean Up Current Code
+### Step 1: Set Up Basic Structure
 ```bash
-# Remove Convex database calls
-# Switch to localStorage
-# Remove portfolio codes
+# Create portfolio input component
+# Set up localStorage utilities
+# Design basic UI layout
 ```
 
 ### Step 2: Create Mock News Data
@@ -201,7 +201,7 @@ if (saved) setPositions(JSON.parse(saved));
 ## POC Success Factors:
 - **One Clear Value**: Filtered news
 - **Minimal Tech**: localStorage + mock data
-- **Existing Assets**: AI parsing, UI design
+- **Fresh Start**: Build from scratch to prove concept
 - **Quick Validation**: 3-5 days to build
 - **Easy Demo**: 30-second experience
 
