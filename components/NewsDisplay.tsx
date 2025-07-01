@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { NewsItem, mockNewsData } from '@/data/mockNews';
+import { ProcessedNewsItem } from '@/app/api/financial-news/route';
 import { 
   filterNewsForPortfolio, 
   convertPortfolioForNews,
@@ -12,10 +13,19 @@ import {
 import { PortfolioPosition } from '@/lib/storage';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Loader2, RefreshCw, AlertCircle } from 'lucide-react';
 
 interface NewsDisplayProps {
   portfolio: PortfolioPosition[];
   className?: string;
+}
+
+interface NewsState {
+  news: ProcessedNewsItem[];
+  loading: boolean;
+  error: string | null;
+  cached: boolean;
+  lastUpdated: string | null;
 }
 
 export default function NewsDisplay({ portfolio, className = '' }: NewsDisplayProps) {
@@ -25,12 +35,153 @@ export default function NewsDisplay({ portfolio, className = '' }: NewsDisplayPr
     sortBy: 'timestamp',
     sortOrder: 'desc'
   });
+  
+  const [newsState, setNewsState] = useState<NewsState>({
+    news: [],
+    loading: false,
+    error: null,
+    cached: false,
+    lastUpdated: null
+  });
+  
+  const [useRealData, setUseRealData] = useState(true);
 
+  // Fetch real news data
+  const fetchNews = async (showLoading = true) => {
+    if (!portfolio || portfolio.length === 0) {
+      setNewsState(prev => ({ ...prev, news: [], loading: false, error: null }));
+      return;
+    }
+
+    if (showLoading) {
+      setNewsState(prev => ({ ...prev, loading: true, error: null }));
+    }
+
+    try {
+      const symbols = portfolio.map(p => p.symbol).join(',');
+      const portfolioData = encodeURIComponent(JSON.stringify(portfolio));
+      
+      const response = await fetch(
+        `/api/financial-news?symbols=${symbols}&portfolio=${portfolioData}`
+      );
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch news: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      setNewsState({
+        news: data.news || [],
+        loading: false,
+        error: null,
+        cached: data.cached || false,
+        lastUpdated: data.timestamp
+      });
+    } catch (error) {
+      console.error('Failed to fetch news:', error);
+      setNewsState(prev => ({
+        ...prev,
+        loading: false,
+        error: error instanceof Error ? error.message : 'Failed to fetch news'
+      }));
+    }
+  };
+  
+  // Fetch news when portfolio changes
+  useEffect(() => {
+    if (useRealData && portfolio && portfolio.length > 0) {
+      fetchNews();
+    }
+  }, [portfolio, useRealData]);
+  
+  // Convert ProcessedNewsItem to NewsItem for compatibility with existing filter logic
+  const convertToNewsItem = (item: ProcessedNewsItem): NewsItem => ({
+    id: item.id,
+    headline: item.headline,
+    summary: item.summary,
+    timestamp: item.timestamp,
+    relatedSymbols: item.relatedSymbols,
+    impact: item.impact,
+    source: item.source,
+    url: item.url
+  });
+  
+  // Helper functions
+  const getFilterDate = (now: Date, timeframe: string): Date => {
+    const filterDate = new Date(now);
+    switch (timeframe) {
+      case 'today':
+        filterDate.setHours(0, 0, 0, 0);
+        break;
+      case 'week':
+        filterDate.setDate(now.getDate() - 7);
+        break;
+      case 'month':
+        filterDate.setMonth(now.getMonth() - 1);
+        break;
+      default:
+        return new Date(0);
+    }
+    return filterDate;
+  };
+  
+  const getImpactScore = (impact: string): number => {
+    switch (impact) {
+      case 'positive': return 3;
+      case 'negative': return 2;
+      case 'neutral': return 1;
+      default: return 0;
+    }
+  };
+  
   // Filter and sort news based on portfolio and options
   const filteredNews = useMemo(() => {
-    const portfolioHoldings = convertPortfolioForNews(portfolio);
-    return filterNewsForPortfolio(mockNewsData, portfolioHoldings, filterOptions);
-  }, [portfolio, filterOptions]);
+    if (useRealData && newsState.news.length > 0) {
+      // For real data, apply basic filtering since relevance scoring is already done
+      let filtered = [...newsState.news];
+      
+      // Apply impact filter
+      if (filterOptions.impact && filterOptions.impact !== 'all') {
+        filtered = filtered.filter(item => item.impact === filterOptions.impact);
+      }
+      
+      // Apply timeframe filter
+      if (filterOptions.timeframe && filterOptions.timeframe !== 'all') {
+        const now = new Date();
+        const filterDate = getFilterDate(now, filterOptions.timeframe);
+        filtered = filtered.filter(item => {
+          const itemDate = new Date(item.timestamp);
+          return itemDate >= filterDate;
+        });
+      }
+      
+      // Sort by selected option
+      filtered.sort((a, b) => {
+        let comparison = 0;
+        switch (filterOptions.sortBy) {
+          case 'timestamp':
+            comparison = new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime();
+            break;
+          case 'relevance':
+            comparison = (b.relevanceScore || 0) - (a.relevanceScore || 0);
+            break;
+          case 'impact':
+            comparison = getImpactScore(b.impact) - getImpactScore(a.impact);
+            break;
+          default:
+            comparison = new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime();
+        }
+        return filterOptions.sortOrder === 'asc' ? comparison : -comparison;
+      });
+      
+      return filtered.map(convertToNewsItem);
+    } else {
+      // Fallback to mock data with existing filter logic
+      const portfolioHoldings = convertPortfolioForNews(portfolio);
+      return filterNewsForPortfolio(mockNewsData, portfolioHoldings, filterOptions);
+    }
+  }, [portfolio, filterOptions, newsState.news, useRealData]);
 
   // Get news statistics
   const newsStats = useMemo(() => {
@@ -98,7 +249,7 @@ export default function NewsDisplay({ portfolio, className = '' }: NewsDisplayPr
     );
   }
 
-  if (filteredNews.length === 0) {
+  if (filteredNews.length === 0 && !newsState.loading && !newsState.error) {
     return (
       <div className={`${className}`}>
         <Card className="bg-card border-border">
@@ -115,30 +266,99 @@ export default function NewsDisplay({ portfolio, className = '' }: NewsDisplayPr
 
   return (
     <div className={`space-y-6 ${className}`}>
-      {/* News Statistics */}
-      <Card className="bg-card border-border">
-        <div className="p-4">
-          <h3 className="text-lg font-semibold text-foreground mb-3">Portfolio News Summary</h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="text-center">
-              <div className="text-2xl font-bold text-foreground">{newsStats.total}</div>
-              <div className="text-sm text-muted-foreground">Total News</div>
+      {/* Loading State */}
+      {newsState.loading && (
+        <Card className="bg-card border-border">
+          <div className="p-6 text-center">
+            <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2 text-primary" />
+            <p className="text-muted-foreground">Loading latest financial news...</p>
+          </div>
+        </Card>
+      )}
+      
+      {/* Error State */}
+      {newsState.error && (
+        <Card className="bg-card border-border border-destructive/50">
+          <div className="p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <AlertCircle className="h-5 w-5 text-destructive" />
+              <h3 className="text-lg font-semibold text-destructive">Failed to Load News</h3>
             </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold price-positive">{newsStats.positive}</div>
-              <div className="text-sm text-muted-foreground">Positive</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold price-negative">{newsStats.negative}</div>
-              <div className="text-sm text-muted-foreground">Negative</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-muted-foreground">{newsStats.neutral}</div>
-              <div className="text-sm text-muted-foreground">Neutral</div>
+            <p className="text-muted-foreground mb-3">{newsState.error}</p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => fetchNews()}
+                className="bg-primary text-primary-foreground hover:bg-primary/90 px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-2"
+              >
+                <RefreshCw className="h-4 w-4" />
+                Retry
+              </button>
+              <button
+                onClick={() => setUseRealData(false)}
+                className="border border-input bg-background hover:bg-accent hover:text-accent-foreground px-4 py-2 rounded-md text-sm font-medium transition-colors"
+              >
+                Use Demo Data
+              </button>
             </div>
           </div>
-        </div>
-      </Card>
+        </Card>
+      )}
+      
+      {/* News Statistics */}
+      {!newsState.loading && (
+        <Card className="bg-card border-border">
+          <div className="p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-lg font-semibold text-foreground">Portfolio News Summary</h3>
+              <div className="flex items-center gap-2">
+                {newsState.cached && (
+                  <Badge variant="outline" className="text-xs">
+                    Cached
+                  </Badge>
+                )}
+                {useRealData && (
+                  <button
+                    onClick={() => fetchNews(false)}
+                    className="text-muted-foreground hover:text-foreground transition-colors"
+                    title="Refresh news"
+                  >
+                    <RefreshCw className="h-4 w-4" />
+                  </button>
+                )}
+                <button
+                  onClick={() => setUseRealData(!useRealData)}
+                  className="text-xs px-2 py-1 bg-muted hover:bg-muted/80 rounded text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {useRealData ? 'Demo' : 'Live'}
+                </button>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="text-center">
+                <div className="text-2xl font-bold text-foreground">{newsStats.total}</div>
+                <div className="text-sm text-muted-foreground">Total News</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold price-positive">{newsStats.positive}</div>
+                <div className="text-sm text-muted-foreground">Positive</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold price-negative">{newsStats.negative}</div>
+                <div className="text-sm text-muted-foreground">Negative</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-muted-foreground">{newsStats.neutral}</div>
+                <div className="text-sm text-muted-foreground">Neutral</div>
+              </div>
+            </div>
+            {newsState.lastUpdated && (
+              <p className="text-xs text-muted-foreground mt-2">
+                Last updated: {new Date(newsState.lastUpdated).toLocaleString()}
+              </p>
+            )}
+          </div>
+        </Card>
+      )}
 
       {/* Filter Controls */}
       <Card className="bg-card border-border">

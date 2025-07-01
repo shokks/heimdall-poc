@@ -19,7 +19,13 @@
       "Bash(pkill:*)",
       "Bash(true)",
       "WebFetch(domain:finnhub.io)",
-      "WebFetch(domain:www.alphavantage.co)"
+      "WebFetch(domain:www.alphavantage.co)",
+      "Bash(curl:*)",
+      "Bash(cp:*)",
+      "Bash(curl:*)",
+      "Bash(npx convex dev:*)",
+      "Bash(grep:*)",
+      "Bash(rg:*)"
     ],
     "deny": []
   }

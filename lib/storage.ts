@@ -9,10 +9,11 @@ export interface PortfolioPosition {
   source?: 'alphavantage' | 'finnhub' | 'demo' | 'cache';
 }
 
+// Legacy localStorage functions for migration and fallback
 /**
- * Save portfolio positions to localStorage
+ * Save portfolio positions to localStorage (legacy)
  */
-export const savePortfolio = (positions: PortfolioPosition[]): void => {
+export const savePortfolioToLocalStorage = (positions: PortfolioPosition[]): void => {
   try {
     localStorage.setItem('portfolio', JSON.stringify(positions));
   } catch (_error) {
@@ -21,9 +22,9 @@ export const savePortfolio = (positions: PortfolioPosition[]): void => {
 };
 
 /**
- * Load portfolio positions from localStorage
+ * Load portfolio positions from localStorage (legacy)
  */
-export const loadPortfolio = (): PortfolioPosition[] => {
+export const loadPortfolioFromLocalStorage = (): PortfolioPosition[] => {
   try {
     const saved = localStorage.getItem('portfolio');
     return saved ? JSON.parse(saved) : [];
@@ -34,9 +35,9 @@ export const loadPortfolio = (): PortfolioPosition[] => {
 };
 
 /**
- * Clear portfolio from localStorage
+ * Clear portfolio from localStorage (legacy)
  */
-export const clearPortfolio = (): void => {
+export const clearPortfolioFromLocalStorage = (): void => {
   try {
     localStorage.removeItem('portfolio');
   } catch (_error) {
@@ -45,9 +46,9 @@ export const clearPortfolio = (): void => {
 };
 
 /**
- * Check if portfolio exists in localStorage
+ * Check if portfolio exists in localStorage (legacy)
  */
-export const hasPortfolio = (): boolean => {
+export const hasPortfolioInLocalStorage = (): boolean => {
   try {
     const saved = localStorage.getItem('portfolio');
     return saved !== null && JSON.parse(saved).length > 0;
@@ -56,6 +57,10 @@ export const hasPortfolio = (): boolean => {
     return false;
   }
 };
+
+// Note: The main portfolio functions (savePortfolio, loadPortfolio, etc.) 
+// are now handled by Convex hooks in components. These legacy functions 
+// are kept for migration purposes.
 
 /**
  * Get portfolio symbols as array

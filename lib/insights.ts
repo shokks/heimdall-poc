@@ -1,5 +1,9 @@
 import type { PortfolioPosition } from './storage';
 
+// Cache configuration
+const INSIGHT_CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+const insightCache = new Map<string, { data: any; timestamp: number }>();
+
 /**
  * News item interface for filtering and insights
  */
@@ -321,3 +325,54 @@ export const mockNewsData: NewsItem[] = [
     description: 'Netflix Inc. demonstrates value of exclusive content with strong viewer engagement.'
   }
 ];
+
+// Additional utility functions for compatibility
+export const createInsightContext = (
+  portfolio: PortfolioPosition[], 
+  enhancedNews?: NewsItem[], 
+  historicalData?: any
+) => {
+  return {
+    portfolio,
+    symbols: portfolio.map(p => p.symbol),
+    totalValue: portfolio.reduce((sum, pos) => sum + (pos.totalValue || 0), 0),
+    enhancedNews: enhancedNews || [],
+    historicalData: historicalData || null
+  };
+};
+
+export const getCachedInsights = (cacheKey: string): PortfolioInsight[] | null => {
+  const cached = insightCache.get(cacheKey);
+  if (cached && Date.now() - cached.timestamp < INSIGHT_CACHE_DURATION) {
+    return cached.data;
+  }
+  return null;
+};
+
+export const setCachedInsights = (cacheKey: string, insights: PortfolioInsight[]): void => {
+  insightCache.set(cacheKey, {
+    data: insights,
+    timestamp: Date.now()
+  });
+};
+
+export const convertToEnhancedNews = (news: any[], portfolio?: PortfolioPosition[]): NewsItem[] => {
+  return news.map(item => ({
+    id: item.id || Math.random().toString(),
+    headline: item.headline || item.title || '',
+    ticker: item.ticker || item.symbol || '',
+    impact: item.impact || 'neutral',
+    timestamp: item.timestamp || 'Unknown',
+    description: item.description || item.summary || ''
+  }));
+};
+
+// Clean up old insight cache entries periodically
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, cache] of insightCache.entries()) {
+    if (now - cache.timestamp > INSIGHT_CACHE_DURATION * 2) {
+      insightCache.delete(key);
+    }
+  }
+}, INSIGHT_CACHE_DURATION);

@@ -5,8 +5,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import {
   type PortfolioPosition,
-  loadPortfolio,
-  savePortfolio,
   calculatePortfolioValue,
   calculatePortfolioDailyChange,
 } from '@/lib/storage';
@@ -24,7 +22,7 @@ import { TrendingUp, TrendingDown, RefreshCw, DollarSign } from 'lucide-react';
  * - Loading states and error handling
  */
 interface PortfolioDisplayProps {
-  portfolio?: PortfolioPosition[];
+  portfolio: PortfolioPosition[];
 }
 
 export function PortfolioDisplay({ portfolio: initialPortfolio }: PortfolioDisplayProps) {
@@ -33,17 +31,13 @@ export function PortfolioDisplay({ portfolio: initialPortfolio }: PortfolioDispl
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Load portfolio from storage or props
+  // Update portfolio when props change
   useEffect(() => {
-    const portfolioToUse = initialPortfolio && initialPortfolio.length > 0 
-      ? initialPortfolio 
-      : loadPortfolio();
-    
-    setPortfolio(portfolioToUse);
+    setPortfolio(initialPortfolio || []);
     
     // If we have positions, fetch prices immediately
-    if (portfolioToUse.length > 0) {
-      fetchStockPrices(portfolioToUse);
+    if (initialPortfolio && initialPortfolio.length > 0) {
+      fetchStockPrices(initialPortfolio);
     }
   }, [initialPortfolio]);
 
@@ -56,8 +50,8 @@ export function PortfolioDisplay({ portfolio: initialPortfolio }: PortfolioDispl
     try {
       const updatedPortfolio = await enrichPortfolioWithPrices(positions);
       setPortfolio(updatedPortfolio);
-      savePortfolio(updatedPortfolio);
       setLastUpdated(new Date());
+      // Note: Portfolio saving is now handled by dashboard component via Convex
     } catch (err) {
       console.error('Error fetching stock prices:', err);
       setError('Failed to update stock prices. Please try again.');

@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { parsePortfolioText } from '@/lib/api';
-import { type PortfolioPosition, savePortfolio } from '@/lib/storage';
+import { type PortfolioPosition } from '@/lib/storage';
 
 interface PortfolioInputProps {
   onPortfolioParsed: (positions: PortfolioPosition[]) => void;
@@ -46,10 +46,7 @@ export default function PortfolioInput({
         return;
       }
 
-      // Save to localStorage
-      savePortfolio(positions);
-
-      // Notify parent component
+      // Notify parent component (dashboard will handle saving to Convex)
       onPortfolioParsed(positions);
 
       // Clear input

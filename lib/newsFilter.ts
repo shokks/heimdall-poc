@@ -2,6 +2,7 @@
 // Filters news based on user's portfolio holdings
 
 import { NewsItem } from '@/data/mockNews';
+import { ProcessedNewsItem } from '@/app/api/financial-news/route';  
 import { PortfolioPosition } from '@/lib/storage';
 
 export interface PortfolioHolding {
@@ -242,4 +243,156 @@ export function getMostMentionedSymbols(newsItems: NewsItem[]): Array<{ symbol: 
   return Array.from(symbolCounts.entries())
     .map(([symbol, count]) => ({ symbol, count }))
     .sort((a, b) => b.count - a.count);
+}
+
+/**
+ * Enhanced filtering for ProcessedNewsItem with additional fields
+ */
+export function filterProcessedNews(
+  newsItems: ProcessedNewsItem[],
+  portfolio: PortfolioHolding[],
+  options: FilterOptions & { 
+    category?: string;
+    minRelevanceScore?: number;
+  } = {}
+): ProcessedNewsItem[] {
+  if (!portfolio || portfolio.length === 0) {
+    return [];
+  }
+
+  // Extract symbols from portfolio
+  const portfolioSymbols = new Set(portfolio.map(holding => holding.symbol.toUpperCase()));
+
+  // Filter news items that contain at least one portfolio symbol
+  let filteredNews = newsItems.filter(item => 
+    item.relatedSymbols.some(symbol => portfolioSymbols.has(symbol.toUpperCase()))
+  );
+
+  // Apply impact filter
+  if (options.impact && options.impact !== 'all') {
+    filteredNews = filteredNews.filter(item => item.impact === options.impact);
+  }
+
+  // Apply category filter
+  if (options.category && options.category !== 'all') {
+    filteredNews = filteredNews.filter(item => item.category === options.category);
+  }
+
+  // Apply relevance score filter
+  if (options.minRelevanceScore !== undefined) {
+    filteredNews = filteredNews.filter(item => 
+      (item.relevanceScore || 0) >= options.minRelevanceScore!
+    );
+  }
+
+  // Apply timeframe filter
+  if (options.timeframe && options.timeframe !== 'all') {
+    const now = new Date();
+    const filterDate = getFilterDate(now, options.timeframe);
+    
+    filteredNews = filteredNews.filter(item => {
+      const itemDate = new Date(item.timestamp);
+      return itemDate >= filterDate;
+    });
+  }
+
+  // Sort the results
+  filteredNews = sortProcessedNews(filteredNews, portfolio, options);
+
+  return filteredNews;
+}
+
+/**
+ * Sorts ProcessedNewsItem based on enhanced criteria
+ */
+function sortProcessedNews(
+  newsItems: ProcessedNewsItem[],
+  portfolio: PortfolioHolding[],
+  options: FilterOptions
+): ProcessedNewsItem[] {
+  const { sortBy = 'relevance', sortOrder = 'desc' } = options;
+
+  return newsItems.sort((a, b) => {
+    let comparison = 0;
+
+    switch (sortBy) {
+      case 'timestamp':
+        comparison = new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime();
+        break;
+      case 'relevance':
+        comparison = (b.relevanceScore || 0) - (a.relevanceScore || 0);
+        break;
+      case 'impact':
+        comparison = getImpactScore(b.impact) - getImpactScore(a.impact);
+        break;
+      default:
+        comparison = (b.relevanceScore || 0) - (a.relevanceScore || 0);
+    }
+
+    return sortOrder === 'asc' ? comparison : -comparison;
+  });
+}
+
+/**
+ * Groups ProcessedNewsItem by category
+ */
+export function groupNewsByCategory(newsItems: ProcessedNewsItem[]): Record<string, ProcessedNewsItem[]> {
+  return newsItems.reduce((groups, item) => {
+    const category = item.category || 'general';
+    if (!groups[category]) {
+      groups[category] = [];
+    }
+    groups[category].push(item);
+    return groups;
+  }, {} as Record<string, ProcessedNewsItem[]>);
+}
+
+/**
+ * Gets top news items by relevance score
+ */
+export function getTopNewsByRelevance(
+  newsItems: ProcessedNewsItem[], 
+  limit = 10
+): ProcessedNewsItem[] {
+  return newsItems
+    .sort((a, b) => (b.relevanceScore || 0) - (a.relevanceScore || 0))
+    .slice(0, limit);
+}
+
+/**
+ * Filters news by category
+ */
+export function filterNewsByCategory(
+  newsItems: ProcessedNewsItem[],
+  category: string
+): ProcessedNewsItem[] {
+  if (category === 'all') return newsItems;
+  return newsItems.filter(item => item.category === category);
+}
+
+/**
+ * Gets category distribution for portfolio news
+ */
+export function getCategoryStats(newsItems: ProcessedNewsItem[]): Record<string, number> {
+  const stats: Record<string, number> = {};
+  
+  newsItems.forEach(item => {
+    const category = item.category || 'general';
+    stats[category] = (stats[category] || 0) + 1;
+  });
+  
+  return stats;
+}
+
+/**
+ * Gets high-impact news items for a portfolio
+ */
+export function getHighImpactNews(
+  newsItems: ProcessedNewsItem[],
+  minRelevanceScore = 5
+): ProcessedNewsItem[] {
+  return newsItems.filter(item => 
+    (item.relevanceScore || 0) >= minRelevanceScore &&
+    (item.impact === 'positive' || item.impact === 'negative')
+  );
 }
