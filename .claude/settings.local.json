@@ -7,7 +7,17 @@
       "Bash(npx ultracite:*)",
       "Bash(npm run build:*)",
       "Bash(npx tsc:*)",
-      "Bash(npx shadcn@latest add:*)"
+      "Bash(npx shadcn@latest add:*)",
+      "Bash(mkdir:*)",
+      "Bash(npm run dev:*)",
+      "Bash(ls:*)",
+      "Bash(timeout 5s npm run dev)",
+      "Bash(true)",
+      "Bash(npm run dev:*)",
+      "Bash(node:*)",
+      "Bash(rm:*)",
+      "Bash(pkill:*)",
+      "Bash(true)"
     ],
     "deny": []
   }

@@ -34,7 +34,7 @@ export interface StockPrice {
   price: number;
   change: number;
   changePercent: string;
-  error?: boolean;
+  error?: string;
 }
 
 /**

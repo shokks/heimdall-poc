@@ -201,3 +201,52 @@
     letter-spacing: var(--tracking-normal);
   }
 }
+
+@layer utilities {
+  /* Financial data utilities */
+  .price-positive {
+    @apply text-green-600 dark:text-green-400;
+  }
+  
+  .price-negative {
+    @apply text-red-600 dark:text-red-400;
+  }
+  
+  .price-neutral {
+    @apply text-muted-foreground;
+  }
+  
+  .stock-symbol {
+    @apply font-mono text-sm font-medium uppercase tracking-wide;
+  }
+  
+  .price-value {
+    @apply font-mono font-semibold;
+  }
+  
+  /* Status indicator utilities */
+  .status-success {
+    @apply bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200;
+  }
+  
+  .status-error {
+    @apply bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200;
+  }
+  
+  .status-warning {
+    @apply bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200;
+  }
+  
+  .status-info {
+    @apply bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200;
+  }
+  
+  /* Interactive utilities */
+  .interactive-card {
+    @apply transition-all duration-200 hover:shadow-md cursor-pointer;
+  }
+  
+  .focus-ring {
+    @apply focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:border-ring;
+  }
+}
