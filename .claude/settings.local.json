@@ -17,7 +17,8 @@
       "Bash(node:*)",
       "Bash(rm:*)",
       "Bash(pkill:*)",
-      "Bash(true)"
+      "Bash(true)",
+      "WebFetch(domain:finnhub.io)"
     ],
     "deny": []
   }

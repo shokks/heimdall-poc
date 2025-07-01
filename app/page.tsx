@@ -62,7 +62,7 @@ export default function Home() {
                 Edit Portfolio
               </button>
             </div>
-            <PortfolioDisplay />
+            <PortfolioDisplay portfolio={portfolio} />
             
             {/* AI Insights Section */}
             <div className="space-y-4">

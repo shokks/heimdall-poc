@@ -23,22 +23,29 @@ import { TrendingUp, TrendingDown, RefreshCw, DollarSign } from 'lucide-react';
  * - Manual refresh capability
  * - Loading states and error handling
  */
-export function PortfolioDisplay() {
-  const [portfolio, setPortfolio] = useState<PortfolioPosition[]>([]);
+interface PortfolioDisplayProps {
+  portfolio?: PortfolioPosition[];
+}
+
+export function PortfolioDisplay({ portfolio: initialPortfolio }: PortfolioDisplayProps) {
+  const [portfolio, setPortfolio] = useState<PortfolioPosition[]>(initialPortfolio || []);
   const [isLoading, setIsLoading] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Load portfolio from storage
+  // Load portfolio from storage or props
   useEffect(() => {
-    const loadedPortfolio = loadPortfolio();
-    setPortfolio(loadedPortfolio);
+    const portfolioToUse = initialPortfolio && initialPortfolio.length > 0 
+      ? initialPortfolio 
+      : loadPortfolio();
+    
+    setPortfolio(portfolioToUse);
     
     // If we have positions, fetch prices immediately
-    if (loadedPortfolio.length > 0) {
-      fetchStockPrices(loadedPortfolio);
+    if (portfolioToUse.length > 0) {
+      fetchStockPrices(portfolioToUse);
     }
-  }, []);
+  }, [initialPortfolio]);
 
   const fetchStockPrices = useCallback(async (positions: PortfolioPosition[]) => {
     if (positions.length === 0) return;
