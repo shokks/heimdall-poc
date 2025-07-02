@@ -37,22 +37,66 @@ export const createSnapshot = mutation({
       )
       .first();
 
-    // Convert portfolio positions to snapshot format
-    const snapshotPositions = portfolio.positions.map(pos => ({
-      symbol: pos.symbol,
-      shares: pos.shares,
-      price: pos.currentPrice || 0,
-      value: pos.totalValue || 0,
-      change: pos.dailyChange || 0,
-      changePercent: pos.dailyChangePercent || "0.00%",
-    }));
+    // Convert portfolio positions to snapshot format with stockPriceId references
+    const snapshotPositions = await Promise.all(
+      portfolio.positions.map(async (pos) => {
+        // Get the latest price entry for this symbol
+        const latestPrice = await ctx.db
+          .query("stockPrices")
+          .withIndex("by_symbol_and_timestamp", (q) => 
+            q.eq("symbol", pos.symbol)
+          )
+          .order("desc")
+          .first();
+
+        if (!latestPrice) {
+          // Create a placeholder price entry if none exists
+          const placeholderPriceId = await ctx.db.insert("stockPrices", {
+            symbol: pos.symbol,
+            price: 0,
+            change: 0,
+            changePercent: "0.00%",
+            timestamp: Date.now(),
+            source: "cache",
+          });
+
+          return {
+            symbol: pos.symbol,
+            shares: pos.shares,
+            stockPriceId: placeholderPriceId,
+          };
+        }
+
+        return {
+          symbol: pos.symbol,
+          shares: pos.shares,
+          stockPriceId: latestPrice._id,
+        };
+      })
+    );
+
+    // Calculate totals from the current price data
+    let totalValue = 0;
+    let totalChange = 0;
+
+    for (const position of snapshotPositions) {
+      const priceData = await ctx.db.get(position.stockPriceId);
+      if (priceData) {
+        const positionValue = priceData.price * position.shares;
+        const positionChange = priceData.change * position.shares;
+        totalValue += positionValue;
+        totalChange += positionChange;
+      }
+    }
+
+    const totalChangePercent = totalValue > 0 ? (totalChange / (totalValue - totalChange)) * 100 : 0;
 
     const snapshotData = {
       userId: user._id,
       portfolioId: portfolio._id,
-      totalValue: portfolio.totalValue,
-      totalChange: portfolio.totalChange,
-      totalChangePercent: portfolio.totalChangePercent,
+      totalValue,
+      totalChange,
+      totalChangePercent,
       positions: snapshotPositions,
       snapshotDate: today,
       timestamp: Date.now(),
@@ -99,7 +143,31 @@ export const getHistoricalData = query({
       .filter((q) => q.gte(q.field("snapshotDate"), cutoffDateString))
       .collect();
 
-    return snapshots.sort((a, b) => a.snapshotDate.localeCompare(b.snapshotDate));
+    // Enrich snapshots with actual price data
+    const enrichedSnapshots = await Promise.all(
+      snapshots.map(async (snapshot) => {
+        const enrichedPositions = await Promise.all(
+          snapshot.positions.map(async (position) => {
+            const priceData = await ctx.db.get(position.stockPriceId);
+            return {
+              symbol: position.symbol,
+              shares: position.shares,
+              price: priceData?.price || 0,
+              value: priceData ? priceData.price * position.shares : 0,
+              change: priceData?.change || 0,
+              changePercent: priceData?.changePercent || "0.00%",
+            };
+          })
+        );
+
+        return {
+          ...snapshot,
+          positions: enrichedPositions,
+        };
+      })
+    );
+
+    return enrichedSnapshots.sort((a, b) => a.snapshotDate.localeCompare(b.snapshotDate));
   },
 });
 
@@ -120,12 +188,36 @@ export const getSnapshotByDate = query({
       return null;
     }
 
-    return await ctx.db
+    const snapshot = await ctx.db
       .query("portfolioSnapshots")
       .withIndex("by_user_and_date", (q) => 
         q.eq("userId", user._id).eq("snapshotDate", args.date)
       )
       .first();
+
+    if (!snapshot) {
+      return null;
+    }
+
+    // Enrich snapshot with actual price data
+    const enrichedPositions = await Promise.all(
+      snapshot.positions.map(async (position) => {
+        const priceData = await ctx.db.get(position.stockPriceId);
+        return {
+          symbol: position.symbol,
+          shares: position.shares,
+          price: priceData?.price || 0,
+          value: priceData ? priceData.price * position.shares : 0,
+          change: priceData?.change || 0,
+          changePercent: priceData?.changePercent || "0.00%",
+        };
+      })
+    );
+
+    return {
+      ...snapshot,
+      positions: enrichedPositions,
+    };
   },
 });
 
@@ -157,11 +249,37 @@ export const getTimeComparison = query({
     }
     const compareDateString = compareDate.toISOString().split('T')[0];
 
-    // Get current portfolio (today's data)
-    const currentPortfolio = await ctx.db
+    // Get current portfolio (today's data) - use the enriched version
+    const currentPortfolioRaw = await ctx.db
       .query("portfolios")
       .withIndex("by_user", (q) => q.eq("userId", user._id))
       .first();
+
+    if (!currentPortfolioRaw) {
+      return null;
+    }
+
+    // Calculate current totals
+    let currentTotalValue = 0;
+    let currentTotalChange = 0;
+
+    for (const position of currentPortfolioRaw.positions) {
+      const latestPrice = await ctx.db
+        .query("stockPrices")
+        .withIndex("by_symbol_and_timestamp", (q) => 
+          q.eq("symbol", position.symbol)
+        )
+        .order("desc")
+        .first();
+
+      if (latestPrice) {
+        currentTotalValue += latestPrice.price * position.shares;
+        currentTotalChange += latestPrice.change * position.shares;
+      }
+    }
+
+    const currentTotalChangePercent = currentTotalValue > 0 ? 
+      (currentTotalChange / (currentTotalValue - currentTotalChange)) * 100 : 0;
 
     // Get historical snapshot
     const historicalSnapshot = await ctx.db
@@ -171,15 +289,11 @@ export const getTimeComparison = query({
       )
       .first();
 
-    if (!currentPortfolio) {
-      return null;
-    }
-
     return {
       current: {
-        totalValue: currentPortfolio.totalValue,
-        totalChange: currentPortfolio.totalChange,
-        totalChangePercent: currentPortfolio.totalChangePercent,
+        totalValue: currentTotalValue,
+        totalChange: currentTotalChange,
+        totalChangePercent: currentTotalChangePercent,
         date: today,
       },
       historical: historicalSnapshot ? {
@@ -189,9 +303,9 @@ export const getTimeComparison = query({
         date: historicalSnapshot.snapshotDate,
       } : null,
       periodChange: historicalSnapshot ? 
-        currentPortfolio.totalValue - historicalSnapshot.totalValue : 0,
+        currentTotalValue - historicalSnapshot.totalValue : 0,
       periodChangePercent: historicalSnapshot && historicalSnapshot.totalValue > 0 ? 
-        ((currentPortfolio.totalValue - historicalSnapshot.totalValue) / historicalSnapshot.totalValue) * 100 : 0,
+        ((currentTotalValue - historicalSnapshot.totalValue) / historicalSnapshot.totalValue) * 100 : 0,
     };
   },
 });
