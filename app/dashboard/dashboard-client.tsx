@@ -210,7 +210,7 @@ export default function DashboardClient() {
         ) : (
           <div className="space-y-8">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <div>
+              <div className="flex flex-col gap-2">
                 <h2 className="text-3xl font-bold">Your Portfolio</h2>
                 <p className="text-muted-foreground">
                   Real-time prices and daily changes for your holdings
@@ -227,6 +227,12 @@ export default function DashboardClient() {
                 <span className="sr-only">Edit Portfolio</span>
               </button>
             </div>
+            <PortfolioInput 
+              onPortfolioParsed={handlePortfolioParsed} 
+              compact 
+              placeholder="Add more stocks: Tesla, Netflix..." 
+            />
+
             <PortfolioDisplay portfolio={portfolio?.positions || []} />
             
             {/* AI Insights Section */}

@@ -278,7 +278,7 @@ export default function NewsDisplay({ portfolio, className = '' }: NewsDisplayPr
       
       {/* Error State */}
       {newsState.error && (
-        <Card className="bg-card border-border border-destructive/50">
+        <Card className="bg-card border-destructive/50">
           <div className="p-4">
             <div className="flex items-center gap-2 mb-2">
               <AlertCircle className="h-5 w-5 text-destructive" />

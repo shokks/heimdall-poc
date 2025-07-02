@@ -30,16 +30,53 @@ export function PortfolioDisplay({ portfolio: initialPortfolio }: PortfolioDispl
   const [isLoading, setIsLoading] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Track newly added positions for highlight/badge
+  const [recentPositions, setRecentPositions] = useState<Record<string, number>>({});
+  const NEW_HIGHLIGHT_DURATION = 5000; // ms
 
   // Update portfolio when props change
   useEffect(() => {
     setPortfolio(initialPortfolio || []);
-    
-    // If we have positions, fetch prices immediately
+
+    // Track newly added positions (with lastUpdated timestamp from backend)
+    if (initialPortfolio) {
+      const now = Date.now();
+      const newEntries: Record<string, number> = {};
+      initialPortfolio.forEach((pos) => {
+        if (
+          pos.lastUpdated &&
+          now - pos.lastUpdated < NEW_HIGHLIGHT_DURATION &&
+          !(pos.symbol in recentPositions)
+        ) {
+          newEntries[pos.symbol] = pos.lastUpdated + NEW_HIGHLIGHT_DURATION;
+        }
+      });
+      if (Object.keys(newEntries).length > 0) {
+        setRecentPositions((prev) => ({ ...prev, ...newEntries }));
+      }
+    }
+
+    // Fetch prices immediately for positions
     if (initialPortfolio && initialPortfolio.length > 0) {
       fetchStockPrices(initialPortfolio);
     }
   }, [initialPortfolio]);
+
+  // Clean up expired recent positions periodically
+  useEffect(() => {
+    if (Object.keys(recentPositions).length === 0) return;
+    const interval = setInterval(() => {
+      const now = Date.now();
+      setRecentPositions((prev) => {
+        const updated: Record<string, number> = {};
+        Object.entries(prev).forEach(([symbol, expiry]) => {
+          if (expiry > now) updated[symbol] = expiry;
+        });
+        return updated;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [recentPositions]);
 
   const fetchStockPrices = useCallback(async (positions: PortfolioPosition[]) => {
     if (positions.length === 0) return;
@@ -180,73 +217,83 @@ export function PortfolioDisplay({ portfolio: initialPortfolio }: PortfolioDispl
 
       {/* Position Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {portfolio.map((position) => (
-          <Card key={position.symbol} className="relative">
-            <CardHeader className="pb-3">
-              <div className="flex items-start justify-between">
-                <div>
-                  <CardTitle className="text-lg font-bold">{position.symbol}</CardTitle>
-                  <p className="text-sm text-muted-foreground line-clamp-2">
-                    {position.companyName}
-                  </p>
-                </div>
-                {position.currentPrice && position.dailyChange !== undefined && (
-                  <Badge
-                    variant={position.dailyChange >= 0 ? 'default' : 'destructive'}
-                    className="flex items-center gap-1"
-                  >
-                    {position.dailyChange >= 0 ? (
-                      <TrendingUp className="h-3 w-3" />
-                    ) : (
-                      <TrendingDown className="h-3 w-3" />
-                    )}
-                    {position.dailyChangePercent && formatPercent(position.dailyChangePercent)}
-                  </Badge>
-                )}
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-xs text-muted-foreground">Shares</p>
-                  <p className="font-semibold">{position.shares.toLocaleString()}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Current Price</p>
-                  <p className="font-semibold">
-                    {position.currentPrice ? formatCurrency(position.currentPrice) : (
-                      <span className="text-muted-foreground">Loading...</span>
-                    )}
-                  </p>
-                </div>
-              </div>
-              
-              <div className="pt-2 border-t">
-                <div className="flex items-center justify-between">
-                  <p className="text-xs text-muted-foreground">Total Value</p>
-                  <p className="font-bold text-lg">
-                    {position.totalValue ? formatCurrency(position.totalValue) : (
-                      <span className="text-muted-foreground">--</span>
-                    )}
-                  </p>
-                </div>
-                {position.currentPrice && position.dailyChange !== undefined && (
-                  <div className="flex items-center justify-between mt-1">
-                    <p className="text-xs text-muted-foreground">Daily P&L</p>
-                    <p
-                      className={`font-semibold text-sm ${
-                        position.dailyChange >= 0 ? 'text-accent' : 'text-destructive'
-                      }`}
-                    >
-                      {position.dailyChange >= 0 ? '+' : ''}
-                      {formatCurrency(position.dailyChange * position.shares)}
+        {portfolio.map((position) => {
+          const isNew = position.symbol in recentPositions;
+          const cardClasses = isNew
+            ? 'relative border-primary/40 bg-primary/5 animate-pulse'
+            : 'relative';
+          return (
+            <Card key={position.symbol} className={cardClasses}>
+              {/* NEW badge */}
+              {isNew && (
+                <span className="absolute top-2 right-2 text-xs font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-full animate-bounce" role="status" aria-label="New position added">NEW</span>
+              )}
+              <CardHeader className="pb-3">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <CardTitle className="text-lg font-bold">{position.symbol}</CardTitle>
+                    <p className="text-sm text-muted-foreground line-clamp-2">
+                      {position.companyName}
                     </p>
                   </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+                  {position.currentPrice && position.dailyChange !== undefined && (
+                    <Badge
+                      variant={position.dailyChange >= 0 ? 'default' : 'destructive'}
+                      className="flex items-center gap-1"
+                    >
+                      {position.dailyChange >= 0 ? (
+                        <TrendingUp className="h-3 w-3" />
+                      ) : (
+                        <TrendingDown className="h-3 w-3" />
+                      )}
+                      {position.dailyChangePercent && formatPercent(position.dailyChangePercent)}
+                    </Badge>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Shares</p>
+                    <p className="font-semibold">{position.shares.toLocaleString()}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Current Price</p>
+                    <p className="font-semibold">
+                      {position.currentPrice ? formatCurrency(position.currentPrice) : (
+                        <span className="text-muted-foreground">Loading...</span>
+                      )}
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="pt-2 border-t">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs text-muted-foreground">Total Value</p>
+                    <p className="font-bold text-lg">
+                      {position.totalValue ? formatCurrency(position.totalValue) : (
+                        <span className="text-muted-foreground">--</span>
+                      )}
+                    </p>
+                  </div>
+                  {position.currentPrice && position.dailyChange !== undefined && (
+                    <div className="flex items-center justify-between mt-1">
+                      <p className="text-xs text-muted-foreground">Daily P&L</p>
+                      <p
+                        className={`font-semibold text-sm ${
+                          position.dailyChange >= 0 ? 'text-accent' : 'text-destructive'
+                        }`}
+                      >
+                        {position.dailyChange >= 0 ? '+' : ''}
+                        {formatCurrency(position.dailyChange * position.shares)}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
 
       {/* Loading Overlay */}

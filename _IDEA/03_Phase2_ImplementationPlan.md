@@ -7,6 +7,7 @@
 ## 🎯 TRANSITION FROM POC TO PROTOTYPE
 
 ### Phase 1 Foundation (Complete):
+
 - ✅ Portfolio input with AI parsing
 - ✅ Real-time stock prices via Alpha Vantage/Finnhub
 - ✅ Mock news filtering by portfolio symbols
@@ -14,6 +15,7 @@
 - ✅ Mobile-first UI with localStorage persistence
 
 ### Phase 2 Upgrade Goals:
+
 - 🎯 Replace localStorage with user accounts + database
 - 🎯 Integrate real news APIs for live updates
 - 🎯 Add time periods (Today/Week/Month) with historical data
@@ -26,11 +28,12 @@
 ## 1.0 User Authentication & Database Migration
 
 ### 1.1 Set Up Clerk Authentication
-- [ ] Install and configure Clerk for Next.js
-- [ ] Set up email/password authentication
-- [ ] Create user registration and login flows
+
+- [x] Install and configure Clerk for Next.js
+- [x] Set up email/password authentication
+- [x] Create user registration and login flows
 - [ ] Add user profile management
-- [ ] Implement protected routes
+- [x] Implement protected routes
 
 ```bash
 # Install Clerk
@@ -61,10 +64,11 @@ export default function RootLayout({
 ```
 
 ### 1.2 Set Up Convex Database
-- [ ] Install and configure Convex
-- [ ] Design database schema for users and portfolios
-- [ ] Create database functions for CRUD operations
-- [ ] Set up real-time subscriptions
+
+- [x] Install and configure Convex
+- [x] Design database schema for users and portfolios
+- [x] Create database functions for CRUD operations
+- [x] Set up real-time subscriptions
 
 ```bash
 # Install Convex
@@ -87,12 +91,14 @@ export default defineSchema({
 
   portfolios: defineTable({
     userId: v.id("users"),
-    positions: v.array(v.object({
-      symbol: v.string(),
-      shares: v.number(),
-      companyName: v.string(),
-      addedAt: v.number(),
-    })),
+    positions: v.array(
+      v.object({
+        symbol: v.string(),
+        shares: v.number(),
+        companyName: v.string(),
+        addedAt: v.number(),
+      })
+    ),
     updatedAt: v.number(),
   }).index("by_user", ["userId"]),
 
@@ -101,13 +107,15 @@ export default defineSchema({
     portfolioId: v.id("portfolios"),
     totalValue: v.number(),
     dailyChange: v.number(),
-    positions: v.array(v.object({
-      symbol: v.string(),
-      shares: v.number(),
-      price: v.number(),
-      value: v.number(),
-      change: v.number(),
-    })),
+    positions: v.array(
+      v.object({
+        symbol: v.string(),
+        shares: v.number(),
+        price: v.number(),
+        value: v.number(),
+        change: v.number(),
+      })
+    ),
     snapshotDate: v.string(), // YYYY-MM-DD
     timestamp: v.number(),
   }).index("by_user_and_date", ["userId", "snapshotDate"]),
@@ -115,9 +123,10 @@ export default defineSchema({
 ```
 
 ### 1.3 Create Database Functions
-- [ ] User management functions
-- [ ] Portfolio CRUD operations
-- [ ] Portfolio snapshots for historical data
+
+- [x] User management functions
+- [x] Portfolio CRUD operations
+- [x] Portfolio snapshots for historical data
 - [ ] Data migration utilities
 
 ```typescript
@@ -132,9 +141,9 @@ export const getPortfolioByUser = query({
       .query("users")
       .withIndex("by_clerk_id", (q) => q.eq("clerkId", args.clerkId))
       .first();
-      
+
     if (!user) return null;
-    
+
     return await ctx.db
       .query("portfolios")
       .withIndex("by_user", (q) => q.eq("userId", user._id))
@@ -145,11 +154,13 @@ export const getPortfolioByUser = query({
 export const savePortfolio = mutation({
   args: {
     clerkId: v.string(),
-    positions: v.array(v.object({
-      symbol: v.string(),
-      shares: v.number(),
-      companyName: v.string(),
-    })),
+    positions: v.array(
+      v.object({
+        symbol: v.string(),
+        shares: v.number(),
+        companyName: v.string(),
+      })
+    ),
   },
   handler: async (ctx, args) => {
     // Implementation for saving portfolio
@@ -158,6 +169,7 @@ export const savePortfolio = mutation({
 ```
 
 ### 1.4 Migrate localStorage to Database
+
 - [ ] Create migration utility for existing users
 - [ ] Update all components to use Convex hooks
 - [ ] Remove localStorage dependencies
@@ -168,10 +180,11 @@ export const savePortfolio = mutation({
 ## 2.0 Real News API Integration
 
 ### 2.1 Choose and Configure News API
-- [ ] Evaluate NewsAPI, Polygon, or Alpha Vantage News
-- [ ] Set up API credentials and rate limiting
-- [ ] Create news fetching service
-- [ ] Implement caching strategy
+
+- [x] Evaluate NewsAPI, Polygon, or Alpha Vantage News
+- [x] Set up API credentials and rate limiting
+- [x] Create news fetching service
+- [x] Implement caching strategy
 
 ```typescript
 // lib/newsAPI.ts
@@ -194,25 +207,29 @@ interface NewsArticle {
 
 export class NewsService {
   private apiKey: string;
-  private baseUrl = 'https://newsapi.org/v2';
+  private baseUrl = "https://newsapi.org/v2";
 
   constructor() {
     this.apiKey = process.env.NEWS_API_KEY!;
   }
 
-  async getStockNews(symbols: string[], timeframe: 'today' | 'week' | 'month' = 'today'): Promise<NewsArticle[]> {
-    const companies = symbols.join(' OR ');
+  async getStockNews(
+    symbols: string[],
+    timeframe: "today" | "week" | "month" = "today"
+  ): Promise<NewsArticle[]> {
+    const companies = symbols.join(" OR ");
     const from = this.getDateRange(timeframe);
-    
+
     const url = `${this.baseUrl}/everything?q=${companies}&from=${from}&sortBy=publishedAt&apiKey=${this.apiKey}`;
-    
+
     const response = await fetch(url);
     const data: NewsAPIResponse = await response.json();
-    
-    return data.articles.filter(article => 
-      symbols.some(symbol => 
-        article.title.toLowerCase().includes(symbol.toLowerCase()) ||
-        article.description?.toLowerCase().includes(symbol.toLowerCase())
+
+    return data.articles.filter((article) =>
+      symbols.some(
+        (symbol) =>
+          article.title.toLowerCase().includes(symbol.toLowerCase()) ||
+          article.description?.toLowerCase().includes(symbol.toLowerCase())
       )
     );
   }
@@ -220,114 +237,120 @@ export class NewsService {
   private getDateRange(timeframe: string): string {
     const now = new Date();
     switch (timeframe) {
-      case 'today':
-        return now.toISOString().split('T')[0];
-      case 'week':
+      case "today":
+        return now.toISOString().split("T")[0];
+      case "week":
         const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-        return weekAgo.toISOString().split('T')[0];
-      case 'month':
+        return weekAgo.toISOString().split("T")[0];
+      case "month":
         const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-        return monthAgo.toISOString().split('T')[0];
+        return monthAgo.toISOString().split("T")[0];
       default:
-        return now.toISOString().split('T')[0];
+        return now.toISOString().split("T")[0];
     }
   }
 }
 ```
 
 ### 2.2 Create News API Route
-- [ ] Replace mock news with real API calls
-- [ ] Implement intelligent filtering and relevance scoring
-- [ ] Add caching and rate limiting
-- [ ] Handle API errors gracefully
+
+- [x] Replace mock news with real API calls
+- [x] Implement intelligent filtering and relevance scoring
+- [x] Add caching and rate limiting
+- [x] Handle API errors gracefully
 
 ```typescript
 // app/api/news/route.ts
-import { NewsService } from '@/lib/newsAPI';
-import { NextRequest } from 'next/server';
+import { NewsService } from "@/lib/newsAPI";
+import { NextRequest } from "next/server";
 
 const newsService = new NewsService();
 
 export async function POST(request: NextRequest) {
   try {
-    const { symbols, timeframe = 'today' } = await request.json();
-    
+    const { symbols, timeframe = "today" } = await request.json();
+
     if (!symbols || !Array.isArray(symbols)) {
-      return Response.json({ error: 'Symbols array required' }, { status: 400 });
+      return Response.json(
+        { error: "Symbols array required" },
+        { status: 400 }
+      );
     }
 
     const articles = await newsService.getStockNews(symbols, timeframe);
-    
+
     // Enhanced filtering and relevance scoring
-    const scoredNews = articles.map(article => ({
-      ...article,
-      relevanceScore: calculateRelevanceScore(article, symbols),
-      extractedSymbols: extractSymbolsFromArticle(article, symbols),
-    })).filter(news => news.relevanceScore > 0.5)
+    const scoredNews = articles
+      .map((article) => ({
+        ...article,
+        relevanceScore: calculateRelevanceScore(article, symbols),
+        extractedSymbols: extractSymbolsFromArticle(article, symbols),
+      }))
+      .filter((news) => news.relevanceScore > 0.5)
       .sort((a, b) => b.relevanceScore - a.relevanceScore)
       .slice(0, 20);
 
     return Response.json({ news: scoredNews });
   } catch (error) {
-    console.error('News API error:', error);
-    return Response.json(
-      { error: 'Failed to fetch news' },
-      { status: 500 }
-    );
+    console.error("News API error:", error);
+    return Response.json({ error: "Failed to fetch news" }, { status: 500 });
   }
 }
 ```
 
 ### 2.3 Implement News Relevance Scoring
-- [ ] Create algorithm to score news relevance to portfolio
-- [ ] Consider stock symbols, company names, and context
-- [ ] Weight by portfolio position size
-- [ ] Filter out low-relevance articles
+
+- [x] Create algorithm to score news relevance to portfolio
+- [x] Consider stock symbols, company names, and context
+- [x] Weight by portfolio position size
+- [x] Filter out low-relevance articles
 
 ```typescript
 // lib/newsRelevance.ts
 export const calculateRelevanceScore = (
-  article: NewsArticle, 
+  article: NewsArticle,
   portfolioSymbols: string[]
 ): number => {
   let score = 0;
   const title = article.title.toLowerCase();
-  const description = article.description?.toLowerCase() || '';
-  
-  portfolioSymbols.forEach(symbol => {
+  const description = article.description?.toLowerCase() || "";
+
+  portfolioSymbols.forEach((symbol) => {
     const companyName = getCompanyName(symbol).toLowerCase();
-    
+
     // Direct symbol mention
     if (title.includes(symbol.toLowerCase())) score += 1.0;
     if (description.includes(symbol.toLowerCase())) score += 0.8;
-    
+
     // Company name mention
     if (title.includes(companyName)) score += 0.9;
     if (description.includes(companyName)) score += 0.7;
-    
+
     // Industry/sector keywords
     const industryKeywords = getIndustryKeywords(symbol);
-    industryKeywords.forEach(keyword => {
+    industryKeywords.forEach((keyword) => {
       if (title.includes(keyword)) score += 0.3;
       if (description.includes(keyword)) score += 0.2;
     });
   });
-  
+
   return Math.min(score, 2.0); // Cap at 2.0
 };
 ```
 
 ### 2.4 Update News Display Component
-- [ ] Modify NewsDisplay to use real API
-- [ ] Add loading states and error handling
-- [ ] Implement news refresh functionality
-- [ ] Add news source attribution
+
+- [x] Modify NewsDisplay to use real API
+- [x] Add loading states and error handling
+- [x] Implement news refresh functionality
+- [x] Add news source attribution
 
 ---
 
 ## 3.0 Time Periods and Historical Data
 
 ### 3.1 Create Time Period Navigation
+
 - [ ] Add Today/Week/Month toggle UI
 - [ ] Implement date range selection
 - [ ] Update URL state for bookmarking
@@ -369,10 +392,11 @@ export default function TimePeriodSelector({ currentPeriod, onPeriodChange }: Ti
 ```
 
 ### 3.2 Implement Portfolio Snapshots
-- [ ] Create daily portfolio snapshot system
-- [ ] Store historical price and performance data
-- [ ] Calculate period-over-period changes
-- [ ] Build data aggregation functions
+
+- [x] Create daily portfolio snapshot system
+- [x] Store historical price and performance data
+- [x] Calculate period-over-period changes
+- [x] Build data aggregation functions
 
 ```typescript
 // convex/portfolioSnapshots.ts
@@ -380,21 +404,26 @@ export const createDailySnapshot = mutation({
   args: {
     userId: v.id("users"),
     portfolioId: v.id("portfolios"),
-    positions: v.array(v.object({
-      symbol: v.string(),
-      shares: v.number(),
-      price: v.number(),
-      change: v.number(),
-    })),
+    positions: v.array(
+      v.object({
+        symbol: v.string(),
+        shares: v.number(),
+        price: v.number(),
+        change: v.number(),
+      })
+    ),
   },
   handler: async (ctx, args) => {
-    const today = new Date().toISOString().split('T')[0];
-    const totalValue = args.positions.reduce((sum, pos) => sum + (pos.shares * pos.price), 0);
-    
+    const today = new Date().toISOString().split("T")[0];
+    const totalValue = args.positions.reduce(
+      (sum, pos) => sum + pos.shares * pos.price,
+      0
+    );
+
     // Check if snapshot already exists for today
     const existingSnapshot = await ctx.db
       .query("portfolioSnapshots")
-      .withIndex("by_user_and_date", (q) => 
+      .withIndex("by_user_and_date", (q) =>
         q.eq("userId", args.userId).eq("snapshotDate", today)
       )
       .first();
@@ -423,6 +452,7 @@ export const createDailySnapshot = mutation({
 ```
 
 ### 3.3 Build Historical Analytics
+
 - [ ] Portfolio performance over time
 - [ ] Period comparisons (day/week/month)
 - [ ] Best and worst performers
@@ -443,37 +473,40 @@ export interface PortfolioAnalytics {
 export const calculatePeriodAnalytics = (
   currentSnapshot: PortfolioSnapshot,
   previousSnapshot: PortfolioSnapshot | null,
-  period: 'today' | 'week' | 'month'
+  period: "today" | "week" | "month"
 ): PortfolioAnalytics => {
   if (!previousSnapshot) {
     return {
       currentValue: currentSnapshot.totalValue,
       periodChange: 0,
       periodChangePercent: 0,
-      bestPerformer: { symbol: '', change: 0 },
-      worstPerformer: { symbol: '', change: 0 },
+      bestPerformer: { symbol: "", change: 0 },
+      worstPerformer: { symbol: "", change: 0 },
       totalGainLoss: 0,
       winLossRatio: 0,
     };
   }
 
   const periodChange = currentSnapshot.totalValue - previousSnapshot.totalValue;
-  const periodChangePercent = (periodChange / previousSnapshot.totalValue) * 100;
+  const periodChangePercent =
+    (periodChange / previousSnapshot.totalValue) * 100;
 
   // Calculate individual stock performance
-  const stockPerformance = currentSnapshot.positions.map(current => {
-    const previous = previousSnapshot.positions.find(p => p.symbol === current.symbol);
+  const stockPerformance = currentSnapshot.positions.map((current) => {
+    const previous = previousSnapshot.positions.find(
+      (p) => p.symbol === current.symbol
+    );
     if (!previous) return { symbol: current.symbol, change: 0 };
-    
+
     const change = ((current.price - previous.price) / previous.price) * 100;
     return { symbol: current.symbol, change };
   });
 
-  const bestPerformer = stockPerformance.reduce((best, current) => 
+  const bestPerformer = stockPerformance.reduce((best, current) =>
     current.change > best.change ? current : best
   );
-  
-  const worstPerformer = stockPerformance.reduce((worst, current) => 
+
+  const worstPerformer = stockPerformance.reduce((worst, current) =>
     current.change < worst.change ? current : worst
   );
 
@@ -484,12 +517,15 @@ export const calculatePeriodAnalytics = (
     bestPerformer,
     worstPerformer,
     totalGainLoss: periodChange,
-    winLossRatio: stockPerformance.filter(s => s.change > 0).length / stockPerformance.length,
+    winLossRatio:
+      stockPerformance.filter((s) => s.change > 0).length /
+      stockPerformance.length,
   };
 };
 ```
 
 ### 3.4 Add Simple Performance Chart
+
 - [ ] Install and configure chart library (Chart.js or Recharts)
 - [ ] Create portfolio value trend line
 - [ ] Add period-specific data points
@@ -500,6 +536,7 @@ export const calculatePeriodAnalytics = (
 ## 4.0 Enhanced AI Insights System
 
 ### 4.1 Multi-Insight Generation
+
 - [ ] Generate 3-5 different types of insights
 - [ ] Portfolio performance analysis
 - [ ] News impact correlation
@@ -510,10 +547,10 @@ export const calculatePeriodAnalytics = (
 // lib/advancedInsights.ts
 export interface PortfolioInsight {
   id: string;
-  type: 'performance' | 'news' | 'risk' | 'opportunity' | 'trend';
+  type: "performance" | "news" | "risk" | "opportunity" | "trend";
   title: string;
   description: string;
-  impact: 'positive' | 'negative' | 'neutral';
+  impact: "positive" | "negative" | "neutral";
   confidence: number; // 0-1
   actionable: boolean;
   relatedSymbols: string[];
@@ -523,18 +560,18 @@ export const generateAdvancedInsights = async (
   portfolio: PortfolioData,
   analytics: PortfolioAnalytics,
   recentNews: NewsArticle[],
-  timeframe: 'today' | 'week' | 'month'
+  timeframe: "today" | "week" | "month"
 ): Promise<PortfolioInsight[]> => {
   const insights: PortfolioInsight[] = [];
 
   // Performance insight
   if (Math.abs(analytics.periodChangePercent) > 2) {
     insights.push({
-      id: 'performance_1',
-      type: 'performance',
-      title: `Portfolio ${analytics.periodChangePercent > 0 ? 'Gains' : 'Decline'}`,
-      description: `Your portfolio is ${analytics.periodChangePercent > 0 ? 'up' : 'down'} ${Math.abs(analytics.periodChangePercent).toFixed(1)}% over the ${timeframe}, outperforming/underperforming the market average.`,
-      impact: analytics.periodChangePercent > 0 ? 'positive' : 'negative',
+      id: "performance_1",
+      type: "performance",
+      title: `Portfolio ${analytics.periodChangePercent > 0 ? "Gains" : "Decline"}`,
+      description: `Your portfolio is ${analytics.periodChangePercent > 0 ? "up" : "down"} ${Math.abs(analytics.periodChangePercent).toFixed(1)}% over the ${timeframe}, outperforming/underperforming the market average.`,
+      impact: analytics.periodChangePercent > 0 ? "positive" : "negative",
       confidence: 0.9,
       actionable: false,
       relatedSymbols: [],
@@ -542,12 +579,16 @@ export const generateAdvancedInsights = async (
   }
 
   // News correlation insight
-  const newsImpactedStocks = correlateNewsWithPerformance(portfolio, recentNews, analytics);
+  const newsImpactedStocks = correlateNewsWithPerformance(
+    portfolio,
+    recentNews,
+    analytics
+  );
   if (newsImpactedStocks.length > 0) {
     insights.push({
-      id: 'news_1',
-      type: 'news',
-      title: 'News Impact Analysis',
+      id: "news_1",
+      type: "news",
+      title: "News Impact Analysis",
       description: `${newsImpactedStocks[0].symbol} movement appears correlated with recent ${newsImpactedStocks[0].newsType} news coverage.`,
       impact: newsImpactedStocks[0].impact,
       confidence: 0.7,
@@ -560,11 +601,11 @@ export const generateAdvancedInsights = async (
   const riskAnalysis = analyzePortfolioRisk(portfolio, analytics);
   if (riskAnalysis.riskLevel > 0.7) {
     insights.push({
-      id: 'risk_1',
-      type: 'risk',
-      title: 'Portfolio Concentration Risk',
+      id: "risk_1",
+      type: "risk",
+      title: "Portfolio Concentration Risk",
       description: `${riskAnalysis.concentratedStock} represents ${riskAnalysis.concentration}% of your portfolio. Consider diversification.`,
-      impact: 'negative',
+      impact: "negative",
       confidence: 0.8,
       actionable: true,
       relatedSymbols: [riskAnalysis.concentratedStock],
@@ -576,12 +617,14 @@ export const generateAdvancedInsights = async (
 ```
 
 ### 4.2 News-Performance Correlation
+
 - [ ] Analyze news sentiment vs stock performance
 - [ ] Identify news-driven movements
 - [ ] Track prediction accuracy
 - [ ] Generate predictive insights
 
 ### 4.3 Enhanced Insights Display
+
 - [ ] Create insight cards with different types
 - [ ] Add confidence indicators
 - [ ] Include actionable recommendations
@@ -654,6 +697,7 @@ export default function AdvancedInsightsDisplay({ insights }: { insights: Portfo
 ## 5.0 Performance Optimization & Caching
 
 ### 5.1 Implement Caching Strategy
+
 - [ ] Cache stock prices with 15-minute TTL
 - [ ] Cache news articles with 1-hour TTL
 - [ ] Implement Redis or in-memory caching
@@ -691,10 +735,10 @@ class CacheManager {
   }
 
   invalidate(pattern: string): void {
-    const keys = Array.from(this.cache.keys()).filter(key => 
+    const keys = Array.from(this.cache.keys()).filter((key) =>
       key.includes(pattern)
     );
-    keys.forEach(key => this.cache.delete(key));
+    keys.forEach((key) => this.cache.delete(key));
   }
 }
 
@@ -702,12 +746,14 @@ export const cache = new CacheManager();
 ```
 
 ### 5.2 Optimize API Routes
+
 - [ ] Add request deduplication
 - [ ] Implement batch processing
 - [ ] Add rate limiting
 - [ ] Optimize database queries
 
 ### 5.3 Frontend Performance
+
 - [ ] Implement React Query for data fetching
 - [ ] Add optimistic updates
 - [ ] Lazy load components
@@ -718,12 +764,14 @@ export const cache = new CacheManager();
 ## 6.0 Beta Testing Infrastructure
 
 ### 6.1 User Onboarding Flow
+
 - [ ] Create welcome tutorial
 - [ ] Add guided portfolio setup
 - [ ] Implement feature highlights
 - [ ] Add help documentation
 
 ### 6.2 Analytics and Monitoring
+
 - [ ] Implement user analytics
 - [ ] Track feature usage
 - [ ] Monitor API performance
@@ -733,22 +781,25 @@ export const cache = new CacheManager();
 // lib/analytics.ts
 export const trackEvent = (event: string, properties: Record<string, any>) => {
   // Implementation for analytics tracking
-  if (typeof window !== 'undefined') {
+  if (typeof window !== "undefined") {
     // Client-side tracking
-    console.log('Track:', event, properties);
+    console.log("Track:", event, properties);
   }
 };
 
-export const trackPortfolioCreated = (symbols: string[], totalValue: number) => {
-  trackEvent('portfolio_created', {
+export const trackPortfolioCreated = (
+  symbols: string[],
+  totalValue: number
+) => {
+  trackEvent("portfolio_created", {
     symbolCount: symbols.length,
     totalValue,
-    symbols: symbols.join(','),
+    symbols: symbols.join(","),
   });
 };
 
 export const trackNewsViewed = (articleId: string, symbol: string) => {
-  trackEvent('news_viewed', {
+  trackEvent("news_viewed", {
     articleId,
     symbol,
     timestamp: Date.now(),
@@ -757,6 +808,7 @@ export const trackNewsViewed = (articleId: string, symbol: string) => {
 ```
 
 ### 6.3 Beta User Management
+
 - [ ] Create beta user invitation system
 - [ ] Add feedback collection
 - [ ] Implement feature flags
@@ -767,18 +819,21 @@ export const trackNewsViewed = (articleId: string, symbol: string) => {
 ## 7.0 UI/UX Enhancements
 
 ### 7.1 Advanced Portfolio Display
+
 - [ ] Add portfolio allocation charts
 - [ ] Enhance position cards with more data
 - [ ] Add drag-and-drop for position ordering
 - [ ] Implement bulk actions
 
 ### 7.2 News Reading Experience
+
 - [ ] Add news article preview
 - [ ] Implement news categorization
 - [ ] Add news search and filtering
 - [ ] Create news reading history
 
 ### 7.3 Mobile Optimization
+
 - [ ] Enhance mobile navigation
 - [ ] Add swipe gestures for time periods
 - [ ] Optimize touch interactions
@@ -789,6 +844,7 @@ export const trackNewsViewed = (articleId: string, symbol: string) => {
 ## 8.0 Testing & Quality Assurance
 
 ### 8.1 Automated Testing
+
 - [ ] Set up Jest and React Testing Library
 - [ ] Write unit tests for utilities
 - [ ] Add integration tests for API routes
@@ -796,26 +852,26 @@ export const trackNewsViewed = (articleId: string, symbol: string) => {
 
 ```typescript
 // __tests__/portfolio.test.ts
-import { calculatePeriodAnalytics } from '../lib/portfolioAnalytics';
+import { calculatePeriodAnalytics } from "../lib/portfolioAnalytics";
 
-describe('Portfolio Analytics', () => {
-  test('calculates period change correctly', () => {
+describe("Portfolio Analytics", () => {
+  test("calculates period change correctly", () => {
     const current = {
       totalValue: 10500,
       positions: [
-        { symbol: 'AAPL', shares: 100, price: 150, value: 15000, change: 5 }
-      ]
+        { symbol: "AAPL", shares: 100, price: 150, value: 15000, change: 5 },
+      ],
     };
-    
+
     const previous = {
       totalValue: 10000,
       positions: [
-        { symbol: 'AAPL', shares: 100, price: 140, value: 14000, change: 0 }
-      ]
+        { symbol: "AAPL", shares: 100, price: 140, value: 14000, change: 0 },
+      ],
     };
 
-    const analytics = calculatePeriodAnalytics(current, previous, 'today');
-    
+    const analytics = calculatePeriodAnalytics(current, previous, "today");
+
     expect(analytics.periodChange).toBe(500);
     expect(analytics.periodChangePercent).toBe(5);
   });
@@ -823,12 +879,14 @@ describe('Portfolio Analytics', () => {
 ```
 
 ### 8.2 Load Testing
+
 - [ ] Test with 50+ concurrent users
 - [ ] Verify database performance
 - [ ] Test API rate limits
 - [ ] Monitor memory usage
 
 ### 8.3 Security Testing
+
 - [ ] Audit authentication flow
 - [ ] Test data isolation between users
 - [ ] Verify API security
@@ -839,18 +897,21 @@ describe('Portfolio Analytics', () => {
 ## 9.0 Deployment & Launch
 
 ### 9.1 Production Infrastructure
+
 - [ ] Set up production Convex environment
 - [ ] Configure Clerk for production
 - [ ] Set up monitoring and alerting
 - [ ] Implement backup strategies
 
 ### 9.2 Beta Launch Strategy
+
 - [ ] Recruit 50 beta users
 - [ ] Create feedback collection system
 - [ ] Plan feature iteration cycles
 - [ ] Set success metrics
 
 ### 9.3 Performance Monitoring
+
 - [ ] Set up application monitoring
 - [ ] Track user engagement metrics
 - [ ] Monitor API performance
@@ -861,6 +922,7 @@ describe('Portfolio Analytics', () => {
 ## Success Criteria & Timeline
 
 ### Phase 2 Success Metrics:
+
 - [ ] 50+ active beta users
 - [ ] Real news correctly filtered by portfolio
 - [ ] Users return daily (>70% day-2 retention)
@@ -871,11 +933,13 @@ describe('Portfolio Analytics', () => {
 - [ ] AI insights provide actionable value (measured by user feedback)
 
 ### 2-3 Week Timeline:
+
 - **Week 1**: Sections 1-3 (Auth, Database, News API, Time Periods)
 - **Week 2**: Sections 4-6 (AI Insights, Performance, Beta Infrastructure)
 - **Week 3**: Sections 7-9 (UI Polish, Testing, Launch)
 
 ### Phase 2 Completion Checklist:
+
 - [ ] All localStorage replaced with user accounts
 - [ ] Real news API integrated and working
 - [ ] Time periods functional with historical data

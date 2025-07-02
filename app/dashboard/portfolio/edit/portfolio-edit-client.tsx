@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useUser, UserButton } from '@clerk/nextjs';
 import { useQuery, useMutation } from 'convex/react';
 import { useRouter } from 'next/navigation';
@@ -41,6 +41,11 @@ export default function PortfolioEditClient() {
   const [error, setError] = useState<string | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [positionToDelete, setPositionToDelete] = useState<string | null>(null);
+
+  // Ref to track the first render to avoid auto-saving immediately after load
+  const isFirstRender = useRef(true);
+  // Debounce timer id
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Convex hooks
   const portfolio = useQuery(
@@ -118,21 +123,16 @@ export default function PortfolioEditClient() {
     setShowDeleteDialog(false);
   };
 
+  /**
+   * Manually triggered save (fallback). This remains for edge-cases but
+   * typical saves will be handled automatically via the effect below.
+   */
   const handleSaveChanges = async () => {
     if (!user) return;
-
     setIsSaving(true);
     try {
-      await savePortfolio({
-        clerkId: user.id,
-        positions: editedPositions,
-      });
-      
-      // Create snapshot after saving
+      await savePortfolio({ clerkId: user.id, positions: editedPositions });
       await createSnapshot({ clerkId: user.id });
-      
-      // Navigate back to dashboard
-      router.push('/dashboard');
     } catch (error) {
       console.error('Failed to save portfolio:', error);
       setError('Failed to save changes. Please try again.');
@@ -140,6 +140,46 @@ export default function PortfolioEditClient() {
       setIsSaving(false);
     }
   };
+
+  /**
+   * Auto-save whenever editedPositions changes (debounced).
+   */
+  useEffect(() => {
+    if (!user) return;
+    // Skip auto-save on initial render after portfolio fetch
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+
+    // Clear any existing timeout to debounce rapid changes
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+
+    // Only attempt save when there are changes
+    const hasChanges = JSON.stringify(editedPositions) !== JSON.stringify(portfolio?.positions || []);
+    if (!hasChanges) return;
+
+    saveTimeoutRef.current = setTimeout(async () => {
+      setIsSaving(true);
+      try {
+        await savePortfolio({ clerkId: user.id, positions: editedPositions });
+        await createSnapshot({ clerkId: user.id });
+      } catch (error) {
+        console.error('Auto-save failed:', error);
+        setError('Failed to auto-save changes. Please try again.');
+      } finally {
+        setIsSaving(false);
+      }
+    }, 1500); // 1.5s debounce
+
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
+  }, [editedPositions, user]);
 
   const hasChanges = JSON.stringify(editedPositions) !== JSON.stringify(portfolio?.positions || []);
 
@@ -307,8 +347,9 @@ export default function PortfolioEditClient() {
             </Button>
             <Button 
               onClick={handleSaveChanges}
-              disabled={!hasChanges || isSaving}
+              disabled
               className="min-w-[120px]"
+              title="Changes are saved automatically"
             >
               {isSaving ? (
                 <>
@@ -318,7 +359,7 @@ export default function PortfolioEditClient() {
               ) : (
                 <>
                   <Save className="mr-2 h-4 w-4" />
-                  Save Changes
+                  Saved ✓
                 </>
               )}
             </Button>

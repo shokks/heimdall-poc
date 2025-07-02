@@ -15,13 +15,18 @@ import { Badge } from '@/components/ui/badge';
 import { parsePortfolioWithValidation } from '@/lib/api';
 import { type PortfolioPosition } from '@/lib/storage';
 import { type ValidationSummary } from '@/types/portfolio';
+import { Input } from '@/components/ui/input';
 
 interface PortfolioInputProps {
   onPortfolioParsed: (positions: PortfolioPosition[]) => void;
+  compact?: boolean;
+  placeholder?: string;
 }
 
 export default function PortfolioInput({
   onPortfolioParsed,
+  compact = false,
+  placeholder,
 }: PortfolioInputProps) {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -82,8 +87,11 @@ export default function PortfolioInput({
     }
   };
 
+  const inputPlaceholder = placeholder ||
+    (compact ? 'Add more stocks: Tesla, Netflix...' : "Tell me about your portfolio: 'I have 100 Apple shares and 50 Microsoft shares' or 'I own TSLA, AAPL, and some Google stock'");
+
   return (
-    <Card className="mx-auto w-full max-w-2xl">
+    <Card className={compact ? 'w-full' : 'mx-auto w-full max-w-2xl'}>
       <CardHeader>
         <CardTitle>Portfolio Intelligence</CardTitle>
         <CardDescription>
@@ -94,13 +102,22 @@ export default function PortfolioInput({
       <CardContent>
         <form className="space-y-4" onSubmit={handleSubmit}>
           <div className="space-y-2">
-            <Textarea
-              className="min-h-24"
-              disabled={loading}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder="Tell me about your portfolio: 'I have 100 Apple shares and 50 Microsoft shares' or 'I own TSLA, AAPL, and some Google stock'"
-              value={input}
-            />
+            {compact ? (
+              <Input
+                disabled={loading}
+                onChange={(e) => setInput(e.target.value)}
+                placeholder={inputPlaceholder}
+                value={input}
+              />
+            ) : (
+              <Textarea
+                className="min-h-24"
+                disabled={loading}
+                onChange={(e) => setInput(e.target.value)}
+                placeholder={inputPlaceholder}
+                value={input}
+              />
+            )}
             {error && <p className="text-destructive text-sm">{error}</p>}
             
             {/* Validation Summary */}
@@ -215,7 +232,7 @@ export default function PortfolioInput({
           </div>
 
           <Button
-            className="w-full"
+            className={compact ? '' : 'w-full'}
             disabled={loading || !input.trim()}
             type="submit"
           >
@@ -230,12 +247,14 @@ export default function PortfolioInput({
           </Button>
         </form>
 
+        {!compact && (
         <div className="mt-6 text-center">
           <p className="text-muted-foreground text-sm">
             ✨ <strong>Example:</strong> "I have 100 Apple shares, 50 Microsoft,
             and 25 Tesla stocks"
           </p>
-        </div>
+        </div>)
+        }
       </CardContent>
     </Card>
   );
