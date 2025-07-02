@@ -1,37 +1,53 @@
 # Portfolio Intelligence - Simplified Product Overview
 
 ## The Problem
+
 Investors are drowning in financial news. They check multiple apps, see hundreds of articles, but 95% of it doesn't affect their actual holdings. They waste hours filtering noise to find what matters to THEIR stocks.
 
-## The Solution
-**Portfolio Intelligence**: A personalized news feed that shows ONLY what affects YOUR stocks. 
+**The Question Every Investor Asks**: "What happened in MY portfolio today that I need to know?"
 
-Enter your portfolio. See only relevant news. Get simple insights. That's it.
+Current portfolio tools show you numbers, charts, and metrics. But what investors really want is:
+
+- What news affects MY specific holdings?
+- Which of MY stocks moved significantly and why?
+- What should I be paying attention to RIGHT NOW?
+
+## The Solution
+
+**Portfolio Intelligence**: A personalized news & intelligence feed that monitors your stocks and shows ONLY what affects YOUR stocks or what matters to YOU.
+
+Enter your portfolio. See only relevant news & insights relevant to your portfolio.
 
 ## Core Value
-"See only the news that matters to YOUR portfolio."
+
+"See only the news & insights that matters to YOUR portfolio."
 
 ---
 
 # Three Phases: POC → Prototype → MVP
 
 ## Phase 1: Proof of Concept (POC)
+
 **Question**: Can we filter news by user holdings and deliver value?
 **Time**: 3-5 days
 **Complexity**: Minimal
 
 ### What to Build:
+
 1. **Portfolio Input**
+
    - AI-powered text input: "I have 100 Apple shares and 50 Microsoft"
    - Parse with OpenAI API
    - Store in localStorage (no database needed)
 
 2. **Portfolio Display**
+
    - Fetch real prices (Alpha Vantage API)
    - Show total value and daily change
    - Clean, mobile-first cards
 
 3. **Filtered News** (Core Feature)
+
    - 15-20 mock news items about various stocks
    - Filter to show ONLY news about user's holdings
    - Example: User owns AAPL → sees Apple news only
@@ -41,6 +57,7 @@ Enter your portfolio. See only relevant news. Get simple insights. That's it.
    - Generated based on actual portfolio
 
 ### Technical Requirements:
+
 - Next.js (current setup)
 - localStorage for persistence
 - OpenAI API integration
@@ -49,6 +66,7 @@ Enter your portfolio. See only relevant news. Get simple insights. That's it.
 - Navy & Teal UI design
 
 ### Success Criteria:
+
 - User enters portfolio naturally
 - Sees only news about their stocks
 - Gets one useful insight
@@ -56,6 +74,7 @@ Enter your portfolio. See only relevant news. Get simple insights. That's it.
 - Entire experience in <30 seconds
 
 ### NOT in POC:
+
 - No user accounts
 - No database
 - No real news API
@@ -67,28 +86,34 @@ Enter your portfolio. See only relevant news. Get simple insights. That's it.
 ---
 
 ## Phase 2: Prototype
+
 **Question**: Can this work with real data at scale?
 **Time**: 2-3 weeks
 **Complexity**: Medium
 
 ### What to Add:
+
 1. **User Authentication**
+
    - Simple email/password with Clerk
    - Portfolios saved to database (now add Convex)
    - No more localStorage
 
 2. **Real News API**
+
    - Integrate NewsAPI or Polygon
    - Live news updates throughout the day
    - Relevance scoring algorithm
 
 3. **Time Periods** (Now Functional)
+
    - Today: Last 24 hours
-   - Week: 7-day summary  
+   - Week: 7-day summary
    - Month: 30-day trends
    - Store daily snapshots
 
 4. **Basic Analytics**
+
    - Performance over time
    - Simple line chart
    - Biggest movers
@@ -99,6 +124,7 @@ Enter your portfolio. See only relevant news. Get simple insights. That's it.
    - Time-specific observations
 
 ### Success Criteria:
+
 - 50+ beta users
 - Real news correctly filtered
 - Users return daily
@@ -108,23 +134,28 @@ Enter your portfolio. See only relevant news. Get simple insights. That's it.
 ---
 
 ## Phase 3: MVP
+
 **Question**: Is this ready for paying customers?
 **Time**: 4-6 weeks
 **Complexity**: Full
 
 ### What to Add:
+
 1. **PDF Upload**
+
    - Parse brokerage statements
    - Auto-import positions
    - Support major brokers
 
 2. **Advanced Features**
+
    - Multiple portfolios
    - Email alerts
    - Sector breakdown
    - Export to Excel
 
 3. **Polish**
+
    - Faster performance
    - Better error handling
    - Onboarding flow
@@ -137,6 +168,7 @@ Enter your portfolio. See only relevant news. Get simple insights. That's it.
    - Customer support
 
 ### Success Criteria:
+
 - 500+ active users
 - <2% churn rate
 - 99.9% uptime
@@ -150,6 +182,7 @@ Enter your portfolio. See only relevant news. Get simple insights. That's it.
 ## POC in 5 Steps:
 
 ### Step 1: Set Up Basic Structure
+
 ```bash
 # Create portfolio input component
 # Set up localStorage utilities
@@ -157,6 +190,7 @@ Enter your portfolio. See only relevant news. Get simple insights. That's it.
 ```
 
 ### Step 2: Create Mock News Data
+
 ```javascript
 const mockNews = [
   {
@@ -164,31 +198,34 @@ const mockNews = [
     headline: "Apple announces record iPhone sales",
     ticker: "AAPL",
     impact: "positive",
-    timestamp: "2 hours ago"
+    timestamp: "2 hours ago",
   },
   // ... 20 more items
-]
+];
 ```
 
 ### Step 3: Implement Filter Logic
+
 ```javascript
 const userStocks = ["AAPL", "MSFT"];
-const relevantNews = mockNews.filter(news => 
+const relevantNews = mockNews.filter((news) =>
   userStocks.includes(news.ticker)
 );
 ```
 
 ### Step 4: localStorage Portfolio
+
 ```javascript
 // Save
-localStorage.setItem('portfolio', JSON.stringify(positions));
+localStorage.setItem("portfolio", JSON.stringify(positions));
 
 // Load
-const saved = localStorage.getItem('portfolio');
+const saved = localStorage.getItem("portfolio");
 if (saved) setPositions(JSON.parse(saved));
 ```
 
 ### Step 5: Deploy and Test
+
 - Deploy to Vercel
 - Test with 5-10 users
 - Gather feedback
@@ -199,6 +236,7 @@ if (saved) setPositions(JSON.parse(saved));
 # Why This Works
 
 ## POC Success Factors:
+
 - **One Clear Value**: Filtered news
 - **Minimal Tech**: localStorage + mock data
 - **Fresh Start**: Build from scratch to prove concept
@@ -206,6 +244,7 @@ if (saved) setPositions(JSON.parse(saved));
 - **Easy Demo**: 30-second experience
 
 ## What We're NOT Building (Yet):
+
 - Complex features that don't prove the core concept
 - Authentication before we know people want this
 - Real-time anything
@@ -213,6 +252,7 @@ if (saved) setPositions(JSON.parse(saved));
 - Multiple views/pages
 
 ## The Result:
+
 A simple, beautiful POC that answers: "Would you use an app that shows only news about YOUR stocks?"
 
 If yes → build Prototype
@@ -223,7 +263,7 @@ If no → pivot quickly with minimal loss
 # Example User Flow (POC):
 
 1. **Land on site** → "See only news that matters to YOUR stocks"
-2. **Enter portfolio** → "I own 100 Apple and 50 Microsoft shares"  
+2. **Enter portfolio** → "I own 100 Apple and 50 Microsoft shares"
 3. **See magic happen** → Only AAPL and MSFT news appears
 4. **Get insight** → "Apple's 5% gain today added $2,500 to your portfolio"
 5. **Bookmark and return** → Portfolio loads from localStorage
