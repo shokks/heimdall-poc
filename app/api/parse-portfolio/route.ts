@@ -185,6 +185,7 @@ Return only the JSON array, no additional text.
         symbol: pos.symbol,
         shares: pos.shares,
         companyName: marketValidation.companyName || pos.companyName,
+        logo: marketValidation.logo,
         confidence: combinedConfidence,
         gptConfidence: pos.confidence,
         searchQuery: pos.searchQuery,

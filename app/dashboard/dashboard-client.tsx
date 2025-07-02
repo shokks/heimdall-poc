@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useUser, UserButton } from '@clerk/nextjs';
 import { useQuery, useMutation } from 'convex/react';
 import { useRouter } from 'next/navigation';
-import { api } from '../../convex/_generated/api';
+import { api } from '@/convex/_generated/api';
 import PortfolioInput from '@/components/PortfolioInput';
 import { PortfolioDisplay } from '@/components/PortfolioDisplay';
 import NewsDisplay from '@/components/NewsDisplay';

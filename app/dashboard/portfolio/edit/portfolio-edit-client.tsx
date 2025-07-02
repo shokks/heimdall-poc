@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useUser, UserButton } from '@clerk/nextjs';
 import { useQuery, useMutation } from 'convex/react';
 import { useRouter } from 'next/navigation';
-import { api } from '../../../../convex/_generated/api';
+import { api } from '@/convex/_generated/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';

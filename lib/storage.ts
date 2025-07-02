@@ -2,6 +2,7 @@ export interface PortfolioPosition {
   symbol: string;
   shares: number;
   companyName: string;
+  logo?: string;
   currentPrice?: number;
   dailyChange?: number;
   dailyChangePercent?: string;

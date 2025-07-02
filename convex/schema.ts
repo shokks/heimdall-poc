@@ -20,6 +20,7 @@ export default defineSchema({
         symbol: v.string(),
         shares: v.number(),
         companyName: v.string(),
+        logo: v.optional(v.string()),
         currentPrice: v.optional(v.number()),
         dailyChange: v.optional(v.number()),
         dailyChangePercent: v.optional(v.string()),

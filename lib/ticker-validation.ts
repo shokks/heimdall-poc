@@ -8,6 +8,7 @@ interface TickerValidationResult {
   isValid: boolean;
   companyName?: string;
   marketCap?: number;
+  logo?: string;
   confidence: number;
   error?: string;
   source: 'finnhub' | 'cache' | 'error';
@@ -22,6 +23,7 @@ interface FinnhubCompanyProfile {
   country: string;
   ipo: string;
   weburl: string;
+  logo?: string;
 }
 
 interface FinnhubQuote {
@@ -315,6 +317,7 @@ export async function validateTicker(symbol: string): Promise<TickerValidationRe
       isValid,
       companyName: hasValidProfile ? profile.name : undefined,
       marketCap: hasValidProfile ? profile.marketCapitalization : undefined,
+      logo: hasValidProfile ? profile.logo : undefined,
       confidence,
       source: 'finnhub'
     };

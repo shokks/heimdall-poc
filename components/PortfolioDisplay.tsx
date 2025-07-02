@@ -230,11 +230,23 @@ export function PortfolioDisplay({ portfolio: initialPortfolio }: PortfolioDispl
               )}
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between">
-                  <div>
-                    <CardTitle className="text-lg font-bold">{position.symbol}</CardTitle>
-                    <p className="text-sm text-muted-foreground line-clamp-2">
-                      {position.companyName}
-                    </p>
+                  <div className="flex items-start gap-3">
+                    {position.logo && (
+                      <img
+                        src={position.logo}
+                        alt={`${position.companyName} logo`}
+                        className="w-10 h-10 rounded-lg object-contain bg-gray-50"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                        }}
+                      />
+                    )}
+                    <div>
+                      <CardTitle className="text-lg font-bold">{position.symbol}</CardTitle>
+                      <p className="text-sm text-muted-foreground line-clamp-2">
+                        {position.companyName}
+                      </p>
+                    </div>
                   </div>
                   {position.currentPrice && position.dailyChange !== undefined && (
                     <Badge
