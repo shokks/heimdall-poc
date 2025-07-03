@@ -30,12 +30,11 @@ export default function DashboardClient() {
     user ? { clerkId: user.id } : "skip"
   );
   const historicalData = useQuery(
-    api.portfolioSnapshots.getHistoricalData,
+    api.historicalData.getPortfolioTrendData,
     user ? { clerkId: user.id, days: 30 } : "skip"
   );
   const createUser = useMutation(api.users.createUser);
   const savePortfolio = useMutation(api.portfolios.savePortfolio);
-  const createSnapshot = useMutation(api.portfolioSnapshots.createSnapshot);
 
   // Initialize user and handle migration
   useEffect(() => {
@@ -117,8 +116,6 @@ export default function DashboardClient() {
           clerkId: user.id,
           positions: mergedPositions,
         });
-        // Create snapshot after saving
-        await createSnapshot({ clerkId: user.id });
         setShowPortfolio(true);
       } catch (error) {
         console.error('Failed to save portfolio:', error);

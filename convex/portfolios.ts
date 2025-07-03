@@ -10,7 +10,7 @@ const portfolioPositionValidator = v.object({
   lastUpdated: v.number(),
 });
 
-// Get enriched portfolio by user's Clerk ID (joins with stocks and prices)
+// Get enriched portfolio by user's Clerk ID (joins with stocks table only)
 export const getPortfolioByUser = query({
   args: { clerkId: v.string() },
   handler: async (ctx, args) => {
@@ -34,58 +34,50 @@ export const getPortfolioByUser = query({
       return null;
     }
 
-    // Enrich positions with stock and price data
-    const enrichedPositions = await Promise.all(
-      portfolio.positions.map(async (position) => {
-        // Get stock information
-        const stock = await ctx.db
-          .query("stocks")
-          .withIndex("by_symbol", (q) => q.eq("symbol", position.symbol))
-          .first();
+    // OPTIMIZED: Batch stock lookup to fix N+1 query problem
+    const symbols = portfolio.positions.map(pos => pos.symbol);
+    const stocks = await ctx.db
+      .query("stocks")
+      .collect()
+      .then(allStocks => 
+        allStocks.filter(stock => symbols.includes(stock.symbol))
+      );
+    
+    // Create lookup map for O(1) access
+    const stocksMap = new Map(stocks.map(stock => [stock.symbol, stock]));
 
-        // Get latest price
-        const latestPrice = await ctx.db
-          .query("stockPrices")
-          .withIndex("by_symbol_and_timestamp", (q) => 
-            q.eq("symbol", position.symbol)
-          )
-          .order("desc")
-          .first();
+    // Enrich positions using the batch-loaded stock data
+    const enrichedPositions = portfolio.positions.map((position) => {
+      const stock = stocksMap.get(position.symbol);
 
-        if (!stock) {
-          // Stock not in master table, return minimal data
-          return {
-            symbol: position.symbol,
-            shares: position.shares,
-            companyName: position.symbol,
-            currentPrice: latestPrice?.price,
-            dailyChange: latestPrice?.change,
-            dailyChangePercent: latestPrice?.changePercent,
-            totalValue: latestPrice ? latestPrice.price * position.shares : undefined,
-            source: latestPrice?.source,
-            lastUpdated: position.lastUpdated,
-          };
-        }
-
+      if (!stock) {
+        // Stock not in master table, return minimal data
         return {
           symbol: position.symbol,
           shares: position.shares,
-          companyName: stock.companyName,
-          logo: stock.logo,
-          sector: stock.sector,
-          marketCap: stock.marketCap,
-          exchange: stock.exchange,
-          currentPrice: latestPrice?.price,
-          dailyChange: latestPrice?.change,
-          dailyChangePercent: latestPrice?.changePercent,
-          totalValue: latestPrice ? latestPrice.price * position.shares : undefined,
-          source: latestPrice?.source,
-          purchasePrice: position.purchasePrice,
-          purchaseDate: position.purchaseDate,
+          companyName: position.symbol,
           lastUpdated: position.lastUpdated,
         };
-      })
-    );
+      }
+
+      return {
+        symbol: position.symbol,
+        shares: position.shares,
+        companyName: stock.companyName,
+        logo: stock.logo,
+        sector: stock.sector,
+        marketCap: stock.marketCap,
+        exchange: stock.exchange,
+        currentPrice: stock.currentPrice,
+        dailyChange: stock.dailyChange,
+        dailyChangePercent: stock.dailyChangePercent,
+        totalValue: stock.currentPrice ? stock.currentPrice * position.shares : undefined,
+        source: stock.source,
+        purchasePrice: position.purchasePrice,
+        purchaseDate: position.purchaseDate,
+        lastUpdated: position.lastUpdated,
+      };
+    });
 
     // Calculate portfolio totals
     const totalValue = enrichedPositions.reduce((sum, pos) => sum + (pos.totalValue || 0), 0);
@@ -127,6 +119,18 @@ export const savePortfolio = mutation({
       totalValue: v.optional(v.number()),
       source: v.optional(v.string()),
       lastUpdated: v.optional(v.number()),
+      // Portfolio parsing validation fields (will be ignored in storage)
+      confidence: v.optional(v.number()),
+      gptConfidence: v.optional(v.number()),
+      isExactMatch: v.optional(v.boolean()),
+      searchQuery: v.optional(v.string()),
+      searchSource: v.optional(v.string()),
+      marketValidation: v.optional(v.object({
+        confidence: v.number(),
+        isValid: v.boolean(),
+        marketCap: v.optional(v.number()),
+        source: v.string(),
+      })),
     })),
   },
   handler: async (ctx, args) => {

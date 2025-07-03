@@ -8,7 +8,7 @@ import {
   calculatePortfolioValue,
   calculatePortfolioDailyChange,
 } from '@/lib/storage';
-import { enrichPortfolioWithPrices, clearStockPriceCache } from '@/lib/api';
+import { enrichPortfolioWithPrices } from '@/lib/api';
 import { TrendingUp, TrendingDown, RefreshCw, DollarSign } from 'lucide-react';
 
 /**
@@ -97,10 +97,7 @@ export function PortfolioDisplay({ portfolio: initialPortfolio }: PortfolioDispl
     }
   }, []);
 
-  const refreshPrices = (skipCache = false) => {
-    if (skipCache) {
-      clearStockPriceCache();
-    }
+  const refreshPrices = () => {
     fetchStockPrices(portfolio);
   };
 
@@ -143,20 +140,12 @@ export function PortfolioDisplay({ portfolio: initialPortfolio }: PortfolioDispl
             <CardTitle className="text-2xl font-bold">Portfolio Summary</CardTitle>
             <div className="flex gap-2">
               <button
-                onClick={() => refreshPrices(false)}
+                onClick={() => refreshPrices()}
                 disabled={isLoading}
                 className="p-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
-                title="Refresh (use cache if available)"
+                title="Refresh portfolio prices"
               >
                 <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-              </button>
-              <button
-                onClick={() => refreshPrices(true)}
-                disabled={isLoading}
-                className="px-3 py-2 text-xs rounded-lg bg-secondary text-secondary-foreground hover:bg-secondary/90 disabled:opacity-50 transition-colors"
-                title="Force refresh (skip cache)"
-              >
-                Force
               </button>
             </div>
           </div>

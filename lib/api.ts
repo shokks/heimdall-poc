@@ -1,207 +1,85 @@
-import type { PortfolioPosition } from './storage';
-import type { ParsePortfolioResponse, PortfolioParsingResult, EnhancedPortfolioPosition } from '@/types/portfolio';
-
 /**
- * Parse portfolio text using OpenAI API with enhanced validation
+ * API utilities for portfolio intelligence
+ * Simplified to use Convex as single source of truth
  */
-export const parsePortfolioText = async (
-  portfolioText: string
-): Promise<PortfolioPosition[]> => {
-  const result = await parsePortfolioWithValidation(portfolioText);
-  return result.positions;
-};
 
-/**
- * Parse portfolio text with full validation details
- */
-export const parsePortfolioWithValidation = async (
-  portfolioText: string
-): Promise<PortfolioParsingResult> => {
-  try {
-    const response = await fetch('/api/parse-portfolio', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ portfolioText }),
-    });
+import { type PortfolioPosition } from './storage';
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
-    }
-
-    const data: ParsePortfolioResponse = await response.json();
-    
-    // Convert enhanced positions to standard positions for backward compatibility
-    const positions: PortfolioPosition[] = data.positions.map((pos: EnhancedPortfolioPosition) => ({
-      symbol: pos.symbol,
-      shares: pos.shares,
-      companyName: pos.companyName,
-      currentPrice: pos.currentPrice,
-      dailyChange: pos.dailyChange,
-      dailyChangePercent: pos.dailyChangePercent,
-      totalValue: pos.totalValue,
-      source: pos.source
-    }));
-
-    const hasWarnings = data.validationSummary.warnings.length > 0;
-    const hasErrors = data.validationSummary.invalidTickers.length > 0;
-
-    return {
-      positions,
-      validationSummary: data.validationSummary,
-      hasWarnings,
-      hasErrors
-    };
-  } catch (error) {
-    if (error instanceof Error) {
-      throw error;
-    }
-    throw new Error('Failed to parse portfolio. Please try again.');
-  }
-};
-
-/**
- * Stock price data from APIs
- */
 export interface StockPrice {
   symbol: string;
   price: number;
   change: number;
   changePercent: string;
+  source: 'alphavantage' | 'finnhub' | 'demo' | 'cache';
   error?: string;
-  source?: 'alphavantage' | 'finnhub' | 'demo';
 }
 
-interface CachedStockPrice extends StockPrice {
-  timestamp: number;
-  expiresAt: number;
+export interface ValidationSummary {
+  totalParsed: number;
+  passedBasicValidation: number;
+  passedMarketValidation: number;
+  invalidTickers: string[];
+  lowConfidenceTickers?: string[];
+  extractedCompanies: string[];
+  searchResults?: Array<{
+    intent: string;
+    found: string | null;
+    confidence: number;
+  }>;
+  warnings: string[];
 }
 
-// Cache duration: 5 minutes for stock prices
-const CACHE_DURATION = 5 * 60 * 1000;
+export interface ParsedPortfolioResult {
+  positions: PortfolioPosition[];
+  validationSummary: ValidationSummary;
+  hasWarnings: boolean;
+}
 
 /**
- * Get cached stock price from localStorage
+ * Parse portfolio using OpenAI with validation
+ * Now relies on Convex for all data persistence
  */
-function getCachedPrice(symbol: string): StockPrice | null {
-  try {
-    const cached = localStorage.getItem(`stock_price_${symbol}`);
-    if (!cached) return null;
-    
-    const data: CachedStockPrice = JSON.parse(cached);
-    if (Date.now() > data.expiresAt) {
-      localStorage.removeItem(`stock_price_${symbol}`);
-      return null;
-    }
-    
-    return {
-      symbol: data.symbol,
-      price: data.price,
-      change: data.change,
-      changePercent: data.changePercent,
-      source: data.source
-    };
-  } catch {
-    return null;
+export const parsePortfolioWithValidation = async (
+  portfolioText: string
+): Promise<ParsedPortfolioResult> => {
+  const response = await fetch('/api/parse-portfolio', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ portfolioText }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.error || 'Failed to parse portfolio');
   }
-}
 
-/**
- * Cache stock price in localStorage
- */
-function setCachedPrice(stockPrice: StockPrice): void {
-  try {
-    const cached: CachedStockPrice = {
-      ...stockPrice,
-      timestamp: Date.now(),
-      expiresAt: Date.now() + CACHE_DURATION
-    };
-    localStorage.setItem(`stock_price_${stockPrice.symbol}`, JSON.stringify(cached));
-  } catch {
-    // Silently fail if localStorage is not available
-  }
-}
-
-/**
- * Clear all cached stock prices
- */
-export function clearStockPriceCache(): void {
-  try {
-    Object.keys(localStorage).forEach(key => {
-      if (key.startsWith('stock_price_')) {
-        localStorage.removeItem(key);
-      }
-    });
-  } catch {
-    // Silently fail if localStorage is not available
-  }
-}
-
-/**
- * Fetch stock prices for multiple symbols with caching
- */
-export const fetchStockPrices = async (
-  symbols: string[],
-  options: { skipCache?: boolean } = {}
-): Promise<StockPrice[]> => {
-  const { skipCache = false } = options;
+  const data = await response.json();
   
-  try {
-    // Check cache first (unless skipCache is true)
-    if (!skipCache) {
-      const cachedPrices: StockPrice[] = [];
-      const uncachedSymbols: string[] = [];
-      
-      for (const symbol of symbols) {
-        const cached = getCachedPrice(symbol);
-        if (cached) {
-          console.log(`Using cached price for ${symbol}:`, cached);
-          cachedPrices.push(cached);
-        } else {
-          uncachedSymbols.push(symbol);
-        }
-      }
-      
-      // If all symbols are cached, return cached data
-      if (uncachedSymbols.length === 0) {
-        console.log('All prices found in cache');
-        return cachedPrices;
-      }
-      
-      // If some are cached, fetch only uncached ones
-      if (uncachedSymbols.length < symbols.length) {
-        console.log(`Fetching ${uncachedSymbols.length} uncached symbols:`, uncachedSymbols);
-        const freshPrices = await fetchStockPrices(uncachedSymbols, { skipCache: true });
-        
-        // Cache the fresh prices
-        freshPrices.forEach(price => {
-          if (!price.error) {
-            setCachedPrice(price);
-          }
-        });
-        
-        // Return combined cached + fresh data in original order
-        return symbols.map(symbol => {
-          const cached = cachedPrices.find(p => p.symbol === symbol);
-          if (cached) return cached;
-          
-          const fresh = freshPrices.find(p => p.symbol === symbol);
-          return fresh || {
-            symbol,
-            price: 0,
-            change: 0,
-            changePercent: '0.00%',
-            error: 'Failed to fetch price'
-          };
-        });
-      }
-      
-      // All symbols need to be fetched
-      symbols.splice(0, symbols.length, ...uncachedSymbols);
-    }
+  return {
+    positions: data.positions || [],
+    validationSummary: data.validationSummary || {
+      totalParsed: 0,
+      passedBasicValidation: 0,
+      passedMarketValidation: 0,
+      invalidTickers: [],
+      extractedCompanies: [],
+      warnings: []
+    },
+    hasWarnings: (data.validationSummary?.warnings?.length || 0) > 0 ||
+      (data.validationSummary?.invalidTickers?.length || 0) > 0 ||
+      (data.validationSummary?.lowConfidenceTickers?.length || 0) > 0
+  };
+};
 
+/**
+ * Fetch stock prices from external APIs (simplified - no localStorage caching)
+ * This function now directly calls the API without caching logic
+ * Caching is handled entirely by Convex background jobs
+ */
+export const fetchStockPrices = async (symbols: string[]): Promise<StockPrice[]> => {
+  try {
     const response = await fetch('/api/stock-prices', {
       method: 'POST',
       headers: {
@@ -215,25 +93,16 @@ export const fetchStockPrices = async (
     }
 
     const data = await response.json();
-    const prices = data.prices || [];
-    
-    // Cache successful responses
-    if (!skipCache) {
-      prices.forEach((price: StockPrice) => {
-        if (!price.error) {
-          setCachedPrice(price);
-        }
-      });
-    }
-    
-    return prices;
-  } catch (_error) {
+    return data.prices || [];
+  } catch (error) {
+    console.error('Error fetching stock prices:', error);
     throw new Error('Failed to fetch stock prices. Please try again.');
   }
 };
 
 /**
- * Enrich portfolio positions with current prices
+ * Enrich portfolio positions with current prices from Convex
+ * This function is now simplified since Convex stocks table contains latest prices
  */
 export const enrichPortfolioWithPrices = async (
   portfolio: PortfolioPosition[]
@@ -242,12 +111,16 @@ export const enrichPortfolioWithPrices = async (
     return portfolio;
   }
 
+  // Note: This function is now primarily used as a fallback
+  // In the optimized architecture, portfolio enrichment happens in Convex
+  // via the getPortfolioByUser query which joins with the stocks table
+  
   try {
-    const symbols = portfolio.map((pos) => pos.symbol);
+    const symbols = portfolio.map(pos => pos.symbol);
     const prices = await fetchStockPrices(symbols);
 
-    return portfolio.map((position) => {
-      const priceData = prices.find((p) => p.symbol === position.symbol);
+    return portfolio.map(position => {
+      const priceData = prices.find(p => p.symbol === position.symbol);
 
       if (priceData && !priceData.error) {
         return {
@@ -256,12 +129,14 @@ export const enrichPortfolioWithPrices = async (
           dailyChange: priceData.change,
           dailyChangePercent: priceData.changePercent,
           totalValue: priceData.price * position.shares,
+          source: priceData.source,
         };
       }
 
       return position;
     });
-  } catch (_error) {
+  } catch (error) {
+    console.error('Error enriching portfolio with prices:', error);
     // Return original portfolio if price fetching fails
     return portfolio;
   }
@@ -278,7 +153,7 @@ export const handleApiError = (error: unknown): string => {
 };
 
 /**
- * Retry utility for API calls
+ * Retry utility for API calls with exponential backoff
  */
 export const retryApiCall = async <T>(
   apiCall: () => Promise<T>,
@@ -293,10 +168,20 @@ export const retryApiCall = async <T>(
     } catch (error) {
       lastError = error;
       if (i < maxRetries - 1) {
-        await new Promise((resolve) => setTimeout(resolve, delay * (i + 1)));
+        // Exponential backoff with jitter
+        const backoffDelay = delay * Math.pow(2, i) + Math.random() * 1000;
+        await new Promise(resolve => setTimeout(resolve, backoffDelay));
       }
     }
   }
 
   throw lastError;
+};
+
+/**
+ * Simple text parsing for portfolio entries (fallback)
+ */
+export const parsePortfolioText = async (portfolioText: string): Promise<PortfolioPosition[]> => {
+  const result = await parsePortfolioWithValidation(portfolioText);
+  return result.positions;
 };

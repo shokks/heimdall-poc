@@ -132,9 +132,15 @@ export async function searchCompanySymbol(query: string): Promise<SymbolSearchRe
       }
     }
 
+    // Patch: Truncate long queries to avoid Finnhub 'q too long' error
+    let finnhubQuery = query;
+    if (query.length > 15) {
+      finnhubQuery = query.split(' ')[0];
+    }
+
     // Use Finnhub symbol search
-    const searchUrl = `https://finnhub.io/api/v1/search?q=${encodeURIComponent(query)}&token=${finnhubKey}`;
-    console.log(`Searching Finnhub for: "${query}"`);
+    const searchUrl = `https://finnhub.io/api/v1/search?q=${encodeURIComponent(finnhubQuery)}&token=${finnhubKey}`;
+    console.log(`Searching Finnhub for: "${finnhubQuery}"`);
     
     const response = await fetch(searchUrl);
     if (!response.ok) {

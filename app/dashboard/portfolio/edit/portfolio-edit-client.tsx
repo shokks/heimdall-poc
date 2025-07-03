@@ -53,7 +53,6 @@ export default function PortfolioEditClient() {
     user ? { clerkId: user.id } : "skip"
   );
   const savePortfolio = useMutation(api.portfolios.savePortfolio);
-  const createSnapshot = useMutation(api.portfolioSnapshots.createSnapshot);
 
   // Initialize edited positions when portfolio loads
   useEffect(() => {
@@ -132,7 +131,6 @@ export default function PortfolioEditClient() {
     setIsSaving(true);
     try {
       await savePortfolio({ clerkId: user.id, positions: editedPositions });
-      await createSnapshot({ clerkId: user.id });
     } catch (error) {
       console.error('Failed to save portfolio:', error);
       setError('Failed to save changes. Please try again.');
@@ -165,7 +163,6 @@ export default function PortfolioEditClient() {
       setIsSaving(true);
       try {
         await savePortfolio({ clerkId: user.id, positions: editedPositions });
-        await createSnapshot({ clerkId: user.id });
       } catch (error) {
         console.error('Auto-save failed:', error);
         setError('Failed to auto-save changes. Please try again.');

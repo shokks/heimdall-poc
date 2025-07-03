@@ -12,7 +12,7 @@ export default defineSchema({
     lastActive: v.number(),
   }).index("by_clerk_id", ["clerkId"]),
 
-  // Stocks table - master stock/company information
+  // Stocks table - master stock information + latest prices (combined)
   stocks: defineTable({
     symbol: v.string(),
     companyName: v.string(),
@@ -20,49 +20,14 @@ export default defineSchema({
     sector: v.optional(v.string()),
     marketCap: v.optional(v.number()),
     exchange: v.optional(v.string()),
+    // Latest price data (updated every 5 minutes)
+    currentPrice: v.optional(v.number()),
+    dailyChange: v.optional(v.number()),
+    dailyChangePercent: v.optional(v.string()),
+    volume: v.optional(v.number()),
+    source: v.optional(v.union(v.literal("alphavantage"), v.literal("finnhub"), v.literal("demo"), v.literal("cache"))),
     lastUpdated: v.number(),
   }).index("by_symbol", ["symbol"]),
-
-  // Stock prices table - centralized price data with history
-  stockPrices: defineTable({
-    symbol: v.string(),
-    price: v.number(),
-    change: v.number(),
-    changePercent: v.string(),
-    volume: v.optional(v.number()),
-    timestamp: v.number(),
-    source: v.union(v.literal("alphavantage"), v.literal("finnhub"), v.literal("demo"), v.literal("cache")),
-  })
-    .index("by_symbol", ["symbol"])
-    .index("by_symbol_and_timestamp", ["symbol", "timestamp"])
-    .index("by_timestamp", ["timestamp"]),
-
-  // News table - centralized news articles
-  news: defineTable({
-    externalId: v.string(), // Original news ID from source
-    title: v.string(),
-    summary: v.string(),
-    url: v.string(),
-    source: v.string(),
-    publishedAt: v.number(),
-    imageUrl: v.optional(v.string()),
-    category: v.optional(v.string()),
-    fetchedAt: v.number(),
-  })
-    .index("by_external_id", ["externalId"])
-    .index("by_published_at", ["publishedAt"])
-    .index("by_source", ["source"]),
-
-  // News-Stock associations table - many-to-many relationship
-  newsStockAssociations: defineTable({
-    newsId: v.id("news"),
-    symbol: v.string(),
-    relevanceScore: v.number(), // 0-1 score
-    mentionType: v.union(v.literal("primary"), v.literal("secondary"), v.literal("mentioned")),
-  })
-    .index("by_news", ["newsId"])
-    .index("by_symbol", ["symbol"])
-    .index("by_symbol_and_relevance", ["symbol", "relevanceScore"]),
 
   // Portfolios table - user-specific position data only
   portfolios: defineTable({
@@ -79,24 +44,39 @@ export default defineSchema({
     updatedAt: v.number(),
   }).index("by_user", ["userId"]),
 
-  // Portfolio snapshots table - references centralized price data
-  portfolioSnapshots: defineTable({
-    userId: v.id("users"),
-    portfolioId: v.id("portfolios"),
-    totalValue: v.number(),
-    totalChange: v.number(),
-    totalChangePercent: v.number(),
-    positions: v.array(
-      v.object({
-        symbol: v.string(), // References stocks table
-        shares: v.number(),
-        stockPriceId: v.id("stockPrices"), // References price at snapshot time
-      })
-    ),
-    snapshotDate: v.string(), // YYYY-MM-DD format
-    timestamp: v.number(),
+  // News table - centralized news with embedded stock associations
+  news: defineTable({
+    externalId: v.string(), // Original news ID from source
+    title: v.string(),
+    summary: v.string(),
+    url: v.string(),
+    source: v.string(),
+    publishedAt: v.number(),
+    imageUrl: v.optional(v.string()),
+    category: v.optional(v.string()),
+    // Embedded stock associations (denormalized for simplicity)
+    relatedSymbols: v.array(v.string()), // Array of stock symbols
+    relevanceScores: v.array(v.number()), // Parallel array for relevance scores (0-1)
+    mentionTypes: v.array(v.union(v.literal("primary"), v.literal("secondary"), v.literal("mentioned"))),
+    fetchedAt: v.number(),
   })
-    .index("by_user", ["userId"])
-    .index("by_user_and_date", ["userId", "snapshotDate"])
-    .index("by_portfolio", ["portfolioId"]),
+    .index("by_external_id", ["externalId"])
+    .index("by_published_at", ["publishedAt"])
+    .index("by_source", ["source"]),
+
+  // Historical price cache - for faster historical data retrieval
+  historicalPrices: defineTable({
+    symbol: v.string(),
+    date: v.string(), // YYYY-MM-DD format
+    open: v.number(),
+    high: v.number(),
+    low: v.number(),
+    close: v.number(),
+    volume: v.optional(v.number()),
+    source: v.union(v.literal("finnhub"), v.literal("alphavantage")),
+    fetchedAt: v.number(),
+  })
+    .index("by_symbol", ["symbol"])
+    .index("by_symbol_and_date", ["symbol", "date"])
+    .index("by_date", ["date"]),
 });
