@@ -200,132 +200,6 @@ export const filterRelevantNews = (
   return news.filter(item => portfolioSymbols.includes(item.ticker));
 };
 
-/**
- * Mock news data for POC
- */
-export const mockNewsData: NewsItem[] = [
-  {
-    id: '1',
-    headline: 'Apple Reports Record iPhone 15 Sales Despite Economic Headwinds',
-    ticker: 'AAPL',
-    impact: 'positive',
-    timestamp: '2 hours ago',
-    description: 'Apple Inc. exceeded analyst expectations with strong iPhone 15 sales numbers.'
-  },
-  {
-    id: '2',
-    headline: 'Microsoft Azure Growth Accelerates with AI Integration',
-    ticker: 'MSFT',
-    impact: 'positive',
-    timestamp: '4 hours ago',
-    description: 'Microsoft Corporation sees strong demand for AI-powered cloud services.'
-  },
-  {
-    id: '3',
-    headline: 'Tesla Faces Production Challenges at Berlin Gigafactory',
-    ticker: 'TSLA',
-    impact: 'negative',
-    timestamp: '1 hour ago',
-    description: 'Tesla Inc. reports temporary production slowdowns affecting delivery targets.'
-  },
-  {
-    id: '4',
-    headline: 'Amazon Prime Membership Hits New Record High',
-    ticker: 'AMZN',
-    impact: 'positive',
-    timestamp: '6 hours ago',
-    description: 'Amazon.com Inc. announces significant growth in Prime subscriber base.'
-  },
-  {
-    id: '5',
-    headline: 'Google Unveils Advanced AI Search Capabilities',
-    ticker: 'GOOGL',
-    impact: 'positive',
-    timestamp: '3 hours ago',
-    description: 'Alphabet Inc. demonstrates new AI-powered search features to boost market position.'
-  },
-  {
-    id: '6',
-    headline: 'Meta Platforms Invests Heavily in Metaverse Infrastructure',
-    ticker: 'META',
-    impact: 'neutral',
-    timestamp: '5 hours ago',
-    description: 'Meta Platforms Inc. continues significant investments in virtual reality technology.'
-  },
-  {
-    id: '7',
-    headline: 'Netflix Faces Increased Competition in Streaming Market',
-    ticker: 'NFLX',
-    impact: 'negative',
-    timestamp: '7 hours ago',
-    description: 'Netflix Inc. reports subscriber growth challenges amid intensifying competition.'
-  },
-  {
-    id: '8',
-    headline: 'NVIDIA Chips Drive AI Revolution Across Industries',
-    ticker: 'NVDA',
-    impact: 'positive',
-    timestamp: '8 hours ago',
-    description: 'NVIDIA Corporation benefits from explosive demand for AI processing capabilities.'
-  },
-  {
-    id: '9',
-    headline: 'Apple Supplier Concerns Impact Stock Price',
-    ticker: 'AAPL',
-    impact: 'negative',
-    timestamp: '5 hours ago',
-    description: 'Supply chain disruptions raise concerns about Apple Inc. production capabilities.'
-  },
-  {
-    id: '10',
-    headline: 'Microsoft Teams Integration Boosts Enterprise Sales',
-    ticker: 'MSFT',
-    impact: 'positive',
-    timestamp: '9 hours ago',
-    description: 'Microsoft Corporation sees strong adoption of integrated productivity solutions.'
-  },
-  {
-    id: '11',
-    headline: 'Tesla Autopilot Technology Receives Regulatory Approval',
-    ticker: 'TSLA',
-    impact: 'positive',
-    timestamp: '10 hours ago',
-    description: 'Tesla Inc. gains important regulatory milestone for autonomous driving technology.'
-  },
-  {
-    id: '12',
-    headline: 'Amazon Web Services Expands Global Data Center Network',
-    ticker: 'AMZN',
-    impact: 'positive',
-    timestamp: '12 hours ago',
-    description: 'Amazon.com Inc. strengthens cloud infrastructure with new regional facilities.'
-  },
-  {
-    id: '13',
-    headline: 'Google Cloud Revenue Growth Exceeds Analyst Projections',
-    ticker: 'GOOGL',
-    impact: 'positive',
-    timestamp: '11 hours ago',
-    description: 'Alphabet Inc. reports strong performance in competitive cloud services market.'
-  },
-  {
-    id: '14',
-    headline: 'Meta Reality Labs Division Reports Significant Losses',
-    ticker: 'META',
-    impact: 'negative',
-    timestamp: '13 hours ago',
-    description: 'Meta Platforms Inc. faces continued financial challenges in metaverse investments.'
-  },
-  {
-    id: '15',
-    headline: 'Netflix Original Content Strategy Shows Promise',
-    ticker: 'NFLX',
-    impact: 'positive',
-    timestamp: '14 hours ago',
-    description: 'Netflix Inc. demonstrates value of exclusive content with strong viewer engagement.'
-  }
-];
-
 // Additional utility functions for compatibility
 export const createInsightContext = (
   portfolio: PortfolioPosition[], 
@@ -356,7 +230,7 @@ export const setCachedInsights = (cacheKey: string, insights: PortfolioInsight[]
   });
 };
 
-export const convertToEnhancedNews = (news: any[], portfolio?: PortfolioPosition[]): NewsItem[] => {
+export const convertToEnhancedNews = (news: any[]): NewsItem[] => {
   return news.map(item => ({
     id: item.id || Math.random().toString(),
     headline: item.headline || item.title || '',

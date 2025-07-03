@@ -26,7 +26,8 @@
       "Bash(npx convex dev:*)",
       "Bash(grep:*)",
       "Bash(rg:*)",
-      "WebFetch(domain:finnhub.io)"
+      "WebFetch(domain:finnhub.io)",
+      "Bash(npx @biomejs/biome check:*)"
     ],
     "deny": []
   }

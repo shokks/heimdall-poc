@@ -24,8 +24,6 @@ import {
 import type { PortfolioPosition } from '@/lib/storage';
 import {
   generatePortfolioInsights,
-  filterRelevantNews,
-  mockNewsData,
   getCachedInsights,
   setCachedInsights,
   type PortfolioInsight,
@@ -392,46 +390,6 @@ const LegacyInsightCard = ({ insight }: { insight: PortfolioInsight }) => {
   );
 };
 
-const NewsCard = ({ newsItem }: { newsItem: NewsItem }) => {
-  const impactColor = getImpactColor(newsItem.impact);
-  const ImpactIcon = getImpactIcon(newsItem.impact);
-
-  return (
-    <Card className="transition-all duration-200 hover:shadow-md">
-      <CardContent className="pt-4">
-        <div className="space-y-3">
-          <div className="flex items-start justify-between gap-3">
-            <h3 className="font-medium text-sm leading-tight line-clamp-2 flex-1">
-              {newsItem.headline}
-            </h3>
-            <div className="flex items-center gap-1 flex-shrink-0">
-              <ImpactIcon className={`h-3 w-3 ${impactColor}`} />
-              <Badge variant="outline" className="text-xs px-2 py-0">
-                {newsItem.ticker}
-              </Badge>
-            </div>
-          </div>
-          
-          {newsItem.description && (
-            <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2">
-              {newsItem.description}
-            </p>
-          )}
-          
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span>{newsItem.timestamp}</span>
-            <Badge 
-              variant={getBadgeVariant(newsItem.impact)} 
-              className="text-xs px-2 py-0"
-            >
-              {newsItem.impact}
-            </Badge>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
-};
 
 export default function InsightsDisplay({ 
   portfolio, 
@@ -445,17 +403,32 @@ export default function InsightsDisplay({
   const [dismissedInsights, setDismissedInsights] = useState<Set<string>>(new Set());
   const [bookmarkedInsights, setBookmarkedInsights] = useState<Set<string>>(new Set());
   
-  // Legacy insights calculation
+  // Legacy insights calculation - using real news data
   const { legacyInsights, relevantNews } = useMemo(() => {
     if (!portfolio || portfolio.length === 0) {
       return { legacyInsights: [], relevantNews: [] };
     }
 
-    const relevantNews = filterRelevantNews(mockNewsData, portfolio);
+    // Convert recentNews to NewsItem format for compatibility
+    const newsItems: NewsItem[] = recentNews.map((item: any) => ({
+      id: item.id || item.externalId || String(Date.now()),
+      headline: item.headline || item.title || '',
+      ticker: item.relatedSymbols?.[0] || '',
+      impact: item.impact || 'neutral',
+      timestamp: item.timestamp || new Date(item.publishedAt || Date.now()).toISOString(),
+      description: item.summary || item.description || ''
+    }));
+
+    // Filter news for portfolio symbols
+    const portfolioSymbols = portfolio.map(pos => pos.symbol);
+    const relevantNews = newsItems.filter(item => 
+      item.ticker && portfolioSymbols.includes(item.ticker)
+    );
+    
     const legacyInsights = generatePortfolioInsights(portfolio, relevantNews);
     
     return { legacyInsights, relevantNews };
-  }, [portfolio]);
+  }, [portfolio, recentNews]);
   
   // Enhanced insights generation
   useEffect(() => {
@@ -667,38 +640,6 @@ export default function InsightsDisplay({
         )}
       </div>
 
-      {/* Relevant News Section */}
-      <div className="space-y-4">
-        <div className="flex items-center gap-2">
-          <Newspaper className="h-5 w-5 text-accent-foreground" />
-          <h2 className="text-lg font-semibold">News for Your Stocks</h2>
-          <Badge variant="secondary" className="text-xs">
-            {relevantNews.length}
-          </Badge>
-        </div>
-        
-        {relevantNews.length > 0 ? (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {relevantNews.slice(0, 6).map((newsItem) => (
-              <NewsCard key={newsItem.id} newsItem={newsItem} />
-            ))}
-          </div>
-        ) : (
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-center text-muted-foreground">
-                <Newspaper className="h-6 w-6 mx-auto mb-2 opacity-50" />
-                <p className="text-sm">
-                  No recent news found for your current holdings
-                </p>
-                <p className="text-xs mt-1">
-                  Try adding more stocks to see relevant news updates
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-      </div>
 
       {/* Portfolio Summary */}
       {portfolio.length > 0 && (

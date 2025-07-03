@@ -35,9 +35,9 @@ export interface ProcessedNewsItem {
   relevanceScore?: number;
 }
 
-// In-memory cache with 5-minute expiration
+// In-memory cache with 30-minute expiration
 const newsCache = new Map<string, NewsCache>();
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes in milliseconds
+const CACHE_DURATION = 30 * 60 * 1000; // 30 minutes in milliseconds
 
 // Keywords for impact analysis
 const POSITIVE_KEYWORDS = [
@@ -169,6 +169,9 @@ async function fetchCompanyNews(symbol: string): Promise<FinnhubNewsItem[]> {
   
   const url = `https://finnhub.io/api/v1/company-news?symbol=${symbol}&from=${fromStr}&to=${toStr}&token=${apiKey}`;
   
+  // Add rate limiting delay
+  await new Promise(resolve => setTimeout(resolve, 3000)); // 3 second delay
+  
   const response = await fetch(url);
   
   if (!response.ok) {
@@ -224,15 +227,17 @@ export async function GET(request: NextRequest) {
       });
     }
     
-    // Fetch fresh news for each symbol
-    const allNewsPromises = symbols.map(symbol => 
-      fetchCompanyNews(symbol).catch(error => {
+    // Fetch fresh news for each symbol sequentially (to avoid rate limits)
+    const newsResults = [];
+    for (const symbol of symbols) {
+      try {
+        const symbolNews = await fetchCompanyNews(symbol);
+        newsResults.push(symbolNews);
+      } catch (error) {
         console.error(`Failed to fetch news for ${symbol}:`, error);
-        return [];
-      })
-    );
-    
-    const newsResults = await Promise.all(allNewsPromises);
+        newsResults.push([]);
+      }
+    }
     const allNews = newsResults.flat();
     
     // Remove duplicates based on news ID

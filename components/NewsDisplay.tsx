@@ -1,11 +1,11 @@
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { NewsItem, mockNewsData } from '@/data/mockNews';
+import { useQuery } from 'convex/react';
+import { api } from '@/convex/_generated/api';
+import { NewsItem } from '@/data/mockNews';
 import { ProcessedNewsItem } from '@/app/api/financial-news/route';
 import { 
-  filterNewsForPortfolio, 
-  convertPortfolioForNews,
   FilterOptions, 
   getNewsStats,
   groupNewsByImpact 
@@ -13,7 +13,7 @@ import {
 import { PortfolioPosition } from '@/lib/storage';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, RefreshCw, AlertCircle } from 'lucide-react';
+import { Loader2, RefreshCw, AlertCircle, Clock } from 'lucide-react';
 
 interface NewsDisplayProps {
   portfolio: PortfolioPosition[];
@@ -45,6 +45,21 @@ export default function NewsDisplay({ portfolio, className = '' }: NewsDisplayPr
   });
   
   const [useRealData, setUseRealData] = useState(true);
+  const [forceAPIFetch, setForceAPIFetch] = useState(false);
+
+  // Get portfolio symbols for Convex query
+  const symbols = portfolio?.map(p => p.symbol) || [];
+  
+  // Query news from Convex database
+  const convexNews = useQuery(
+    api.news.getNewsForSymbols,
+    symbols.length > 0 ? {
+      symbols,
+      minRelevanceScore: 0.3,
+      limit: 50,
+      hoursBack: 48 // Show last 48 hours of news
+    } : "skip"
+  );
 
   // Fetch real news data
   const fetchNews = async (showLoading = true) => {
@@ -88,12 +103,58 @@ export default function NewsDisplay({ portfolio, className = '' }: NewsDisplayPr
     }
   };
   
-  // Fetch news when portfolio changes
+  // Update news state based on Convex data or API fallback
   useEffect(() => {
-    if (useRealData && portfolio && portfolio.length > 0) {
+    if (convexNews && convexNews.length > 0 && !forceAPIFetch) {
+      // Use Convex data as primary source
+      const processedNews: ProcessedNewsItem[] = convexNews.map(item => ({
+        id: item.externalId,
+        headline: item.title,
+        summary: item.summary,
+        timestamp: new Date(item.publishedAt).toISOString(),
+        relatedSymbols: item.relatedSymbols,
+        impact: getImpactFromRelevance(item),
+        source: item.source,
+        url: item.url,
+        relevanceScore: Math.max(...item.relevanceScores)
+      }));
+
+      setNewsState({
+        news: processedNews,
+        loading: false,
+        error: null,
+        cached: true, // Convex data is persisted
+        lastUpdated: new Date().toISOString()
+      });
+    } else if (useRealData && portfolio && portfolio.length > 0 && (!convexNews || forceAPIFetch)) {
+      // Fallback to direct API if no Convex data or forced refresh
       fetchNews();
+    } else if (!useRealData) {
+      // Clear news when switching to demo mode (user choice)
+      setNewsState({
+        news: [],
+        loading: false,
+        error: null,
+        cached: false,
+        lastUpdated: null
+      });
     }
-  }, [portfolio, useRealData]);
+  }, [portfolio, useRealData, convexNews, forceAPIFetch]);
+
+  // Helper to determine impact from relevance and mention types
+  const getImpactFromRelevance = (item: any): 'positive' | 'negative' | 'neutral' => {
+    // Simple heuristic: primary mentions are more impactful
+    const hasPrimary = item.mentionTypes?.includes('primary');
+    const avgRelevance = item.relevanceScores.reduce((a: number, b: number) => a + b, 0) / item.relevanceScores.length;
+    
+    // You could enhance this with sentiment analysis
+    if (hasPrimary && avgRelevance > 0.7) {
+      return 'positive'; // High relevance primary mentions
+    } else if (avgRelevance < 0.5) {
+      return 'neutral'; // Low relevance
+    }
+    return 'neutral'; // Default to neutral without sentiment analysis
+  };
   
   // Convert ProcessedNewsItem to NewsItem for compatibility with existing filter logic
   const convertToNewsItem = (item: ProcessedNewsItem): NewsItem => ({
@@ -137,8 +198,8 @@ export default function NewsDisplay({ portfolio, className = '' }: NewsDisplayPr
   
   // Filter and sort news based on portfolio and options
   const filteredNews = useMemo(() => {
-    if (useRealData && newsState.news.length > 0) {
-      // For real data, apply basic filtering since relevance scoring is already done
+    if (newsState.news.length > 0) {
+      // Apply filtering and sorting to real news data
       let filtered = [...newsState.news];
       
       // Apply impact filter
@@ -177,11 +238,10 @@ export default function NewsDisplay({ portfolio, className = '' }: NewsDisplayPr
       
       return filtered.map(convertToNewsItem);
     } else {
-      // Fallback to mock data with existing filter logic
-      const portfolioHoldings = convertPortfolioForNews(portfolio);
-      return filterNewsForPortfolio(mockNewsData, portfolioHoldings, filterOptions);
+      // No news available - return empty array
+      return [];
     }
-  }, [portfolio, filterOptions, newsState.news, useRealData]);
+  }, [portfolio, filterOptions, newsState.news]);
 
   // Get news statistics
   const newsStats = useMemo(() => {
@@ -256,7 +316,9 @@ export default function NewsDisplay({ portfolio, className = '' }: NewsDisplayPr
           <div className="p-6 text-center">
             <h3 className="text-lg font-semibold text-foreground mb-2">No News Available</h3>
             <p className="text-muted-foreground">
-              No recent news found for your portfolio holdings.
+              {newsState.news.length === 0 
+                ? "News data is being fetched automatically. Check back in a few minutes."
+                : "No news found matching your current filters. Try adjusting the timeframe or impact filters."}
             </p>
           </div>
         </Card>
@@ -285,21 +347,13 @@ export default function NewsDisplay({ portfolio, className = '' }: NewsDisplayPr
               <h3 className="text-lg font-semibold text-destructive">Failed to Load News</h3>
             </div>
             <p className="text-muted-foreground mb-3">{newsState.error}</p>
-            <div className="flex gap-2">
-              <button
-                onClick={() => fetchNews()}
-                className="bg-primary text-primary-foreground hover:bg-primary/90 px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-2"
-              >
-                <RefreshCw className="h-4 w-4" />
-                Retry
-              </button>
-              <button
-                onClick={() => setUseRealData(false)}
-                className="border border-input bg-background hover:bg-accent hover:text-accent-foreground px-4 py-2 rounded-md text-sm font-medium transition-colors"
-              >
-                Use Demo Data
-              </button>
-            </div>
+            <button
+              onClick={() => fetchNews()}
+              className="bg-primary text-primary-foreground hover:bg-primary/90 px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-2"
+            >
+              <RefreshCw className="h-4 w-4" />
+              Retry
+            </button>
           </div>
         </Card>
       )}
@@ -311,26 +365,36 @@ export default function NewsDisplay({ portfolio, className = '' }: NewsDisplayPr
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-lg font-semibold text-foreground">Portfolio News Summary</h3>
               <div className="flex items-center gap-2">
-                {newsState.cached && (
+                {/* News source indicator */}
+                {convexNews && !forceAPIFetch && (
                   <Badge variant="outline" className="text-xs">
-                    Cached
+                    <Clock className="h-3 w-3 mr-1" />
+                    Database
                   </Badge>
                 )}
+                {newsState.cached && forceAPIFetch && (
+                  <Badge variant="outline" className="text-xs">
+                    API
+                  </Badge>
+                )}
+                {/* Manual refresh button */}
                 {useRealData && (
                   <button
-                    onClick={() => fetchNews(false)}
+                    onClick={() => {
+                      setForceAPIFetch(true);
+                      fetchNews(false);
+                      // Reset force flag after fetch
+                      setTimeout(() => setForceAPIFetch(false), 5000);
+                    }}
                     className="text-muted-foreground hover:text-foreground transition-colors"
-                    title="Refresh news"
+                    title="Fetch latest news from API"
                   >
                     <RefreshCw className="h-4 w-4" />
                   </button>
                 )}
-                <button
-                  onClick={() => setUseRealData(!useRealData)}
-                  className="text-xs px-2 py-1 bg-muted hover:bg-muted/80 rounded text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  {useRealData ? 'Demo' : 'Live'}
-                </button>
+                <Badge variant="outline" className="text-xs">
+                  Live Data
+                </Badge>
               </div>
             </div>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

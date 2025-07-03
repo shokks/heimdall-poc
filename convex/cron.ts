@@ -3,17 +3,23 @@ import { internal } from "./_generated/api";
 
 const crons = cronJobs();
 
-// Update stock prices every 5 minutes during market hours (9:30 AM - 4:00 PM ET, Monday-Friday)
+// Update stock prices every 30 minutes during market hours (9:30 AM - 4:00 PM ET, Monday-Friday)
 crons.interval(
   "update stock prices",
-  { minutes: 5 },
+  { minutes: 30 },
   internal.background.updateStockPrices
 );
 
-// Update news data every 15 minutes
-crons.interval(
-  "update news data", 
-  { minutes: 15 },
+// Update news data twice daily at 6 AM and 12 PM ET (before market open and midday)
+crons.cron(
+  "update news data morning", 
+  "0 6 * * *", // Daily at 6 AM
+  internal.background.updateNewsData
+);
+
+crons.cron(
+  "update news data midday", 
+  "0 12 * * *", // Daily at 12 PM
   internal.background.updateNewsData
 );
 
@@ -24,10 +30,10 @@ crons.cron(
   internal.background.cleanupOldData
 );
 
-// Health check every hour to monitor API status
+// Health check every 4 hours to monitor API status (reduced frequency)
 crons.interval(
   "api health check",
-  { hours: 1 },
+  { hours: 4 },
   internal.background.healthCheck
 );
 

@@ -345,8 +345,8 @@ export const getPortfolioTrendData = query({
           totalChange: historicalData.totalChange,
         });
 
-        // Rate limiting between date requests
-        await new Promise(resolve => setTimeout(resolve, 200));
+        // Note: Rate limiting removed - queries cannot use setTimeout
+        // If rate limiting is needed, convert this to an action instead
       } catch (error) {
         console.error(`Error fetching trend data for ${date}:`, error);
       }
