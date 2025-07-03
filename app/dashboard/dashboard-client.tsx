@@ -195,11 +195,11 @@ export default function DashboardClient() {
           <div className="flex flex-col items-center justify-center min-h-[70vh] space-y-8">
             <div className="text-center space-y-4 max-w-2xl">
               <h2 className="text-3xl font-bold tracking-tight">
-                Set Up Your Portfolio
+                Turn News Noise Into Investment Intelligence
               </h2>
               <p className="text-xl text-muted-foreground">
-                Get personalized financial news for your stock portfolio. 
-                Enter your holdings and see only the news that matters to you.
+                Stop drowning in irrelevant financial news. Just tell us what you own, 
+                and we'll show you only the stories that could move YOUR stocks.
               </p>
             </div>
             <PortfolioInput onPortfolioParsed={handlePortfolioParsed} />

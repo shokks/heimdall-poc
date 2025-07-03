@@ -88,15 +88,15 @@ export default function PortfolioInput({
   };
 
   const inputPlaceholder = placeholder ||
-    (compact ? 'Add more stocks: Tesla, Netflix...' : "Tell me about your portfolio: 'I have 100 Apple shares and 50 Microsoft shares' or 'I own TSLA, AAPL, and some Google stock'");
+    (compact ? 'Add more stocks: Tesla, Netflix...' : "I own 100 Apple shares, some Tesla stock, and Microsoft...");
 
   return (
     <Card className={compact ? 'w-full' : 'mx-auto w-full max-w-2xl'}>
       <CardHeader>
-        <CardTitle>Portfolio Intelligence</CardTitle>
+        <CardTitle>Your Portfolio, Your News</CardTitle>
         <CardDescription>
-          Tell me about your portfolio in natural language, and I'll show you
-          only the news that matters to YOUR stocks.
+          Just describe your holdings in plain English. We'll instantly filter 
+          the entire financial world down to what matters for your money.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -242,7 +242,7 @@ export default function PortfolioInput({
                 Analyzing Your Portfolio...
               </>
             ) : (
-              'Parse My Portfolio'
+              'Show Me My News'
             )}
           </Button>
         </form>
@@ -250,8 +250,7 @@ export default function PortfolioInput({
         {!compact && (
         <div className="mt-6 text-center">
           <p className="text-muted-foreground text-sm">
-            ✨ <strong>Example:</strong> "I have 100 Apple shares, 50 Microsoft,
-            and 25 Tesla stocks"
+            ✨ <strong>Try:</strong> "I have Apple, Tesla, and some Google stock" or "100 AAPL, 50 TSLA"
           </p>
         </div>)
         }
